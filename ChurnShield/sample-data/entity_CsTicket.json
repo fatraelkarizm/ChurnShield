@@ -1,0 +1,10 @@
+{"displayName":"CsTicket","description":"ChurnShield synthetic network trouble tickets","fields":[
+{"name":"TicketCode","type":"STRING","isRequired":true},
+{"name":"CustomerCode","type":"STRING"},
+{"name":"Category","type":"STRING"},
+{"name":"Description","type":"MULTILINE_TEXT","lengthLimit":2000},
+{"name":"OpenedAt","type":"DATETIME_WITH_TZ"},
+{"name":"SlaHours","type":"DECIMAL","decimalPrecision":0},
+{"name":"TicketStatus","type":"STRING"},
+{"name":"Escalated","type":"BOOLEAN"},
+{"name":"EscalationNote","type":"MULTILINE_TEXT","lengthLimit":2000}]}

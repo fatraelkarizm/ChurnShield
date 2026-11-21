@@ -1,0 +1,226 @@
+{
+  "version": "1.2.0",
+  "settings": {
+    "model": "anthropic.claude-sonnet-5",
+    "maxTokens": 16384,
+    "temperature": 1,
+    "engine": "basic-v2",
+    "maxIterations": 25,
+    "mode": "standard"
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentContext__output__name": {
+        "type": "string"
+      },
+      "agentContext__output__plan": {
+        "type": "string"
+      },
+      "agentContext__output__fee": {
+        "type": "string"
+      },
+      "agentContext__output__city": {
+        "type": "string"
+      },
+      "agentContext__output__tenure": {
+        "type": "string"
+      },
+      "agentContext__output__contractLeft": {
+        "type": "string"
+      },
+      "agentContext__output__outages": {
+        "type": "string"
+      },
+      "agentContext__output__packetLoss": {
+        "type": "string"
+      },
+      "agentContext__output__latency": {
+        "type": "string"
+      },
+      "agentContext__output__complaints": {
+        "type": "string"
+      },
+      "agentContext__output__lastComplaint": {
+        "type": "string"
+      },
+      "agentContext__output__ticket": {
+        "type": "string"
+      },
+      "agentContext__output__score": {
+        "type": "string"
+      },
+      "agentContext__output__level": {
+        "type": "string"
+      },
+      "agentContext__output__reasons": {
+        "type": "string"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "riskSummary": {
+        "type": "string"
+      },
+      "recommendedAction": {
+        "type": "string"
+      },
+      "offer": {
+        "type": "string"
+      },
+      "followUpMessage": {
+        "type": "string"
+      }
+    }
+  },
+  "metadata": {
+    "storageVersion": "50.0.0",
+    "isConversational": false,
+    "showProjectCreationExperience": false
+  },
+  "type": "lowCode",
+  "guardrails": [],
+  "messages": [
+    {
+      "role": "system",
+      "content": "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin (misalnya 'tidak akan ada gangguan lagi'). Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. Return a result conforming to the output schema. riskSummary: 1-2 kalimat ringkasan risiko. recommendedAction: langkah retensi yang disarankan untuk tim. offer: satu penawaran sesuai kebijakan, spesifik dan singkat. followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan offer; maksimal 90 kata, tanpa tanda tangan nama orang.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin (misalnya 'tidak akan ada gangguan lagi'). Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. Return a result conforming to the output schema. riskSummary: 1-2 kalimat ringkasan risiko. recommendedAction: langkah retensi yang disarankan untuk tim. offer: satu penawaran sesuai kebijakan, spesifik dan singkat. followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan offer; maksimal 90 kata, tanpa tanda tangan nama orang."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Nama: {{input.agentContext__output__name}}\nPaket: {{input.agentContext__output__plan}} (Rp {{input.agentContext__output__fee}}/bulan)\nKota: {{input.agentContext__output__city}}\nLama berlangganan: {{input.agentContext__output__tenure}} bulan, sisa kontrak: {{input.agentContext__output__contractLeft}} bulan\nGangguan 30 hari: {{input.agentContext__output__outages}}, packet loss: {{input.agentContext__output__packetLoss}}%, latency: {{input.agentContext__output__latency}} ms\nKeluhan 30 hari: {{input.agentContext__output__complaints}}, keluhan terakhir: {{input.agentContext__output__lastComplaint}}\nTiket lewat SLA: {{input.agentContext__output__ticket}}\nSkor churn: {{input.agentContext__output__score}} ({{input.agentContext__output__level}})\nAlasan: {{input.agentContext__output__reasons}}",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Nama: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__name"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nPaket: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__plan"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " (Rp "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__fee"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "/bulan)\nKota: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__city"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nLama berlangganan: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__tenure"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " bulan, sisa kontrak: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__contractLeft"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " bulan\nGangguan 30 hari: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__outages"
+        },
+        {
+          "type": "simpleText",
+          "rawString": ", packet loss: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__packetLoss"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "%, latency: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__latency"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " ms\nKeluhan 30 hari: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__complaints"
+        },
+        {
+          "type": "simpleText",
+          "rawString": ", keluhan terakhir: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__lastComplaint"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nTiket lewat SLA: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__ticket"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nSkor churn: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__score"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " ("
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__level"
+        },
+        {
+          "type": "simpleText",
+          "rawString": ")\nAlasan: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.agentContext__output__reasons"
+        }
+      ]
+    }
+  ],
+  "projectId": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
+  "id": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
+  "name": "recommend"
+}

@@ -1,0 +1,6 @@
+{
+  "riskThreshold": 0.6,
+  "topN": 5,
+  "scoringMode": "rules",
+  "externalModelUrl": ""
+}

@@ -1,0 +1,6160 @@
+{
+  "id": "f10cb1af-e962-41ad-aba8-40d250ac2453",
+  "version": "1.9",
+  "name": "ChurnShield",
+  "runtime": "maestro",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "core.trigger.manual",
+      "typeVersion": "1.0",
+      "display": {
+        "label": "Manual trigger",
+        "icon": "play"
+      },
+      "inputs": {
+        "entryPointId": "09d4f06e-0102-4000-8000-08d6b8c20102",
+        "isDefaultEntryPoint": true
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "Data passed when manually triggering the workflow.",
+          "source": "null",
+          "var": "output"
+        }
+      },
+      "uniqueId": "0b1eb0bb-2a96-499a-af0f-f0d8bf41f163"
+    },
+    {
+      "id": "newRun",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "newRun",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n      const d = new Date();\n      const p = (n) => String(n).padStart(2, \"0\");\n      return \"RUN-\" + d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + \"-\" +\n        p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds());\n    "
+      },
+      "outputs": {
+        "output": {
+          "type": "string",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "c4872340-4d48-40a9-9a2c-a355e1dc9fb5"
+    },
+    {
+      "id": "readCustomers",
+      "type": "core.datafabric.read",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "readCustomers",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsCustomer",
+          "resultMode": "multiple",
+          "_recordLimit": 1000,
+          "_sort": {
+            "field": "CustomerCode",
+            "direction": "asc"
+          }
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record queried by this node, or the matching records under \"results\"",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "uniqueId": "87df11a1-0af6-4a6f-b67e-7548e72db3dd"
+    },
+    {
+      "id": "readTickets",
+      "type": "core.datafabric.read",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "readTickets",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsTicket",
+          "resultMode": "multiple",
+          "_recordLimit": 1000,
+          "_sort": {
+            "field": "OpenedAt",
+            "direction": "asc"
+          },
+          "_filters": [
+            {
+              "field": "TicketStatus",
+              "operator": "=",
+              "value": "Open"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record queried by this node, or the matching records under \"results\"",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "uniqueId": "fec1f1cb-a92c-4391-b726-e45100c5c814"
+    },
+    {
+      "id": "ingest",
+      "type": "core.logic.merge",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "ingest",
+        "icon": "merge"
+      },
+      "inputs": {},
+      "uniqueId": "ea1c10b7-a725-4aa7-a849-f7bf6e0e003b"
+    },
+    {
+      "id": "buildFeatures",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "buildFeatures",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n      const customers = $vars.readCustomers.output.results || [];\n      const tickets = $vars.readTickets.output.results || [];\n      const now = Date.now();\n      const byCustomer = {};\n      for (const t of tickets) {\n        const hoursOpen = (now - new Date(t.OpenedAt).getTime()) / 3600000;\n        const overdueBy = hoursOpen - Number(t.SlaHours || 0);\n        const row = { id: t.Id, code: t.TicketCode, category: t.Category, overdueBy: overdueBy };\n        (byCustomer[t.CustomerCode] = byCustomer[t.CustomerCode] || []).push(row);\n      }\n      const features = customers.map((c) => {\n        const open = byCustomer[c.CustomerCode] || [];\n        const overdue = open.filter((t) => t.overdueBy > 0).sort((x, y) => y.overdueBy - x.overdueBy);\n        const worst = overdue[0];\n        return {\n          customerCode: c.CustomerCode, customerName: c.CustomerName, servicePlan: c.ServicePlan,\n          monthlyFee: Number(c.MonthlyFee || 0), city: c.City, contactEmail: c.ContactEmail,\n          tenureMonths: Number(c.TenureMonths || 0), contractMonthsLeft: Number(c.ContractMonthsLeft || 0),\n          outages30d: Number(c.Outages30d || 0), avgPacketLoss: Number(c.AvgPacketLoss || 0),\n          avgLatencyMs: Number(c.AvgLatencyMs || 0), complaints30d: Number(c.Complaints30d || 0),\n          lastComplaint: c.LastComplaint || \"\",\n          openTickets: open.length, overdueTickets: overdue.length,\n          overdueTicketId: worst ? worst.id : \"\", overdueTicketCode: worst ? worst.code : \"\",\n          overdueTicketCategory: worst ? worst.category : \"\",\n          hoursOverdue: worst ? Math.round(worst.overdueBy) : 0,\n          revenueAtRisk: Number(c.MonthlyFee || 0) * 12\n        };\n      });\n      return { features: features, customerCount: features.length, openTicketCount: tickets.length };\n    "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "features": {
+              "type": "array"
+            },
+            "customerCount": {
+              "type": "number"
+            },
+            "openTicketCount": {
+              "type": "number"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "8e1493b9-3bde-48d2-b7a2-de496edc927d"
+    },
+    {
+      "id": "scoreRules",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "scoreRules",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n      const negative = [\"pindah provider\", \"kecewa\", \"putus\", \"berhenti\", \"lag\", \"terganggu\"];\n      const scored = $vars.buildFeatures.output.features.map((f) => {\n        const reasons = [];\n        let s = 0;\n        const add = (w, why) => { if (w > 0) { s += w; reasons.push(why); } };\n        add(Math.min(f.outages30d / 6, 1) * 0.25, f.outages30d + \" gangguan dalam 30 hari\");\n        add(Math.min(f.avgPacketLoss / 5, 1) * 0.15 * (f.avgPacketLoss >= 2 ? 1 : 0), \"packet loss rata-rata \" + f.avgPacketLoss + \"%\");\n        add(Math.min(Math.max(f.avgLatencyMs - 60, 0) / 150, 1) * 0.10, \"latency rata-rata \" + f.avgLatencyMs + \" ms\");\n        add(Math.min(f.complaints30d / 4, 1) * 0.15 * (f.complaints30d >= 2 ? 1 : 0), f.complaints30d + \" keluhan dalam 30 hari\");\n        const text = String(f.lastComplaint).toLowerCase();\n        if (negative.some((w) => text.indexOf(w) >= 0)) add(0.10, \"keluhan bernada negatif: \\\"\" + f.lastComplaint + \"\\\"\");\n        if (f.overdueTickets > 0) add(0.15, \"tiket \" + f.overdueTicketCode + \" lewat SLA \" + f.hoursOverdue + \" jam\");\n        if (f.contractMonthsLeft <= 0) add(0.10, \"kontrak sudah habis bulan ini\");\n        else if (f.contractMonthsLeft <= 1) add(0.10, \"kontrak habis dalam 1 bulan\");\n        else if (f.contractMonthsLeft <= 3) add(0.05, \"kontrak habis dalam \" + f.contractMonthsLeft + \" bulan\");\n        if (f.tenureMonths < 6) add(0.05, \"pelanggan baru (\" + f.tenureMonths + \" bulan)\");\n        const score = Math.round(Math.min(s, 1) * 100) / 100;\n        return Object.assign({}, f, {\n          churnScore: score,\n          riskLevel: score >= 0.75 ? \"Very High\" : score >= 0.6 ? \"High\" : score >= 0.35 ? \"Medium\" : \"Low\",\n          reasons: reasons.length ? reasons.join(\"; \") : \"tidak ada sinyal risiko signifikan\"\n        });\n      });\n      return { scored: scored };\n    "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "scored": {
+              "type": "array"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "ce0a2de6-1374-4a91-b315-2b2aeb24aad2"
+    },
+    {
+      "id": "useExternalModel",
+      "type": "core.logic.decision",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "useExternalModel",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "True",
+        "falseLabel": "False",
+        "expression": "$vars.cfgMode === \"external\" && $vars.cfgModelUrl !== \"\""
+      },
+      "uniqueId": "902a9598-6da2-4667-bfc5-4717dbbcb323"
+    },
+    {
+      "id": "callModel",
+      "type": "core.action.http.v2",
+      "typeVersion": "2.6",
+      "display": {
+        "label": "callModel",
+        "icon": "https://cloud.uipath.com/elements_/scaleunit_/58cb4f17-4581-4130-a2ae-52448b37dc03/v3/element/elements/uipath-uipath-http/image"
+      },
+      "inputs": {
+        "branches": [],
+        "timeout": "PT15M",
+        "retryCount": 0,
+        "detail": {
+          "connector": "uipath-uipath-http",
+          "connectionId": "ImplicitConnection",
+          "connectionResourceId": null,
+          "connectionFolderKey": null,
+          "method": "POST",
+          "endpoint": "/http-request",
+          "bodyParameters": {
+            "authentication": "manual",
+            "method": "POST",
+            "url": "=js:$vars.cfgModelUrl",
+            "body": "=js:({ customers: $vars.buildFeatures.output.features })"
+          },
+          "configuration": "=jsonString:{\"essentialConfiguration\":{\"instanceParameters\":{\"connectorKey\":\"uipath-uipath-http\",\"objectName\":\"http-request\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\"},\"objectName\":\"http-request\",\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"POST\",\"path\":\"/http-request\",\"unifiedTypesCompatible\":true,\"savedJitInputFieldId\":\"in_http-request\"}}",
+          "uiPathActivityTypeId": "5c4cc855-b42a-37e6-b910-de8588998fce",
+          "errorState": {
+            "issues": []
+          },
+          "telemetryData": {
+            "connectorKey": "uipath-uipath-http",
+            "connectorName": "HTTP",
+            "operationType": "create",
+            "objectName": "http-request",
+            "objectDisplayName": "HTTP Request",
+            "primaryKeyName": ""
+          }
+        },
+        "errorHandlingEnabled": true,
+        "defaultBranch": {
+          "enabled": true,
+          "label": ""
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "HTTP response object",
+          "source": "=response",
+          "var": "output",
+          "properties": {
+            "body": {
+              "type": "object",
+              "description": "Response body, deserialized by Integration Service",
+              "properties": {
+                "scores": {
+                  "type": "array"
+                }
+              }
+            },
+            "code": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP status code"
+              },
+              "headers": {
+                "type": "object",
+                "description": "Response headers"
+              },
+              "body": {
+                "description": "Response body"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "9bb45392-c552-48b6-8825-2b63687150e4"
+    },
+    {
+      "id": "modelFallback",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "modelFallback",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "return \"External model failed; rule-based scores were used\";"
+      },
+      "outputs": {
+        "output": {
+          "type": "string",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "69296509-ec1f-4a46-92fb-01f8aa61147f"
+    },
+    {
+      "id": "mergeModelScores",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "mergeModelScores",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n            const byCode = {};\n            for (const s of ($vars.callModel.output.body.scores || [])) byCode[s.customerCode] = s;\n            let matched = 0;\n            const scored = $vars.scored.map((r) => {\n              const m = byCode[r.customerCode];\n              if (!m) return r;\n              matched++;\n              const score = Math.round(Number(m.churnScore) * 100) / 100;\n              return Object.assign({}, r, {\n                churnScore: score,\n                riskLevel: score >= 0.75 ? \"Very High\" : score >= 0.6 ? \"High\" : score >= 0.35 ? \"Medium\" : \"Low\",\n                reasons: (m.topReasons || []).join(\"; \") || r.reasons\n              });\n            });\n            return { scored: scored, note: \"External model scored \" + matched + \" customers\" };\n          "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "scored": {
+              "type": "array"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "1884070d-6173-462f-bad0-77ade47f3e92"
+    },
+    {
+      "id": "prioritize",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "prioritize",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n      const threshold = Number($vars.cfgThreshold);\n      const topN = Math.max(0, Math.floor(Number($vars.cfgTopN)));\n      const high = $vars.scored.filter((r) => r.churnScore >= threshold);\n      high.sort((a, b) => (b.churnScore * b.revenueAtRisk) - (a.churnScore * a.revenueAtRisk));\n      const top = high.slice(0, topN);\n      const total = high.reduce((s, r) => s + r.revenueAtRisk, 0);\n      return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length };\n    "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "top": {
+              "type": "array"
+            },
+            "highRiskCount": {
+              "type": "number"
+            },
+            "highRiskRevenue": {
+              "type": "number"
+            },
+            "scoredCount": {
+              "type": "number"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "8fe6a8c8-88b6-4417-a2d7-de57b4a89f2c"
+    },
+    {
+      "id": "eachCustomer",
+      "type": "core.logic.loop",
+      "typeVersion": "2.4",
+      "display": {
+        "label": "eachCustomer",
+        "icon": "repeat"
+      },
+      "inputs": {
+        "collection": {
+          "type": "jsExpression",
+          "expression": "$vars.prioritize.output.top",
+          "fieldType": "array"
+        },
+        "parallel": true,
+        "breakEnabled": false
+      },
+      "outputs": {
+        "currentItem": {
+          "type": "any",
+          "description": "The current item being iterated in the loop",
+          "source": "=loopContext.currentItem",
+          "var": "currentItem",
+          "scope": "internal"
+        },
+        "currentIteration": {
+          "type": "number",
+          "description": "The current iteration number (1-based)",
+          "source": "=loopContext.currentIteration",
+          "var": "currentIteration",
+          "scope": "internal"
+        },
+        "collection": {
+          "type": "array",
+          "description": "The collection being iterated over",
+          "source": "=loopContext.collection",
+          "var": "collection",
+          "scope": "internal"
+        },
+        "output": {
+          "type": "array",
+          "description": "Aggregated results from all loop iterations",
+          "source": "=loopContext.output",
+          "var": "output",
+          "scope": "external"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "6c293bc4-27b0-4fd9-bc9b-cb4e14560bf4"
+    },
+    {
+      "id": "openCase",
+      "type": "core.datafabric.create",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "openCase",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "fieldValues": [
+            {
+              "field": "RunId",
+              "value": "=js:$vars.newRun.output"
+            },
+            {
+              "field": "CustomerCode",
+              "value": "=js:$vars.eachCustomer.currentItem.customerCode"
+            },
+            {
+              "field": "CustomerName",
+              "value": "=js:$vars.eachCustomer.currentItem.customerName"
+            },
+            {
+              "field": "ChurnScore",
+              "value": "=js:$vars.eachCustomer.currentItem.churnScore"
+            },
+            {
+              "field": "RiskLevel",
+              "value": "=js:$vars.eachCustomer.currentItem.riskLevel"
+            },
+            {
+              "field": "TopReasons",
+              "value": "=js:$vars.eachCustomer.currentItem.reasons"
+            },
+            {
+              "field": "RevenueAtRisk",
+              "value": "=js:$vars.eachCustomer.currentItem.revenueAtRisk"
+            },
+            {
+              "field": "ScoringMode",
+              "value": "=js:$vars.scoringUsed"
+            },
+            {
+              "field": "TicketEscalated",
+              "value": "=js:$vars.eachCustomer.currentItem.overdueTicketId !== \"\""
+            },
+            {
+              "field": "CaseStatus",
+              "value": "Analyzing"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record created by this node",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "69cef274-dcb6-4a18-aa46-190d7c7e247b"
+    },
+    {
+      "id": "hasOverdueTicket",
+      "type": "core.logic.decision",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "hasOverdueTicket",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "True",
+        "falseLabel": "False",
+        "expression": "$vars.eachCustomer.currentItem.overdueTicketId !== \"\""
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "166e28a1-440c-48bf-be47-4813aa5dea8d"
+    },
+    {
+      "id": "escalateTicket",
+      "type": "core.datafabric.update",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "escalateTicket",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsTicket",
+          "recordSource": "byId",
+          "recordId": "=js:$vars.eachCustomer.currentItem.overdueTicketId",
+          "fieldUpdates": [
+            {
+              "field": "TicketStatus",
+              "value": "Escalated"
+            },
+            {
+              "field": "Escalated",
+              "value": "true"
+            },
+            {
+              "field": "EscalationNote",
+              "value": "=js:\"ChurnShield \" + $vars.newRun.output + \": pelanggan \" + $vars.eachCustomer.currentItem.customerCode +\n                \" risiko churn \" + $vars.eachCustomer.currentItem.churnScore + \" (\" + $vars.eachCustomer.currentItem.riskLevel +\n                \"), revenue at risk Rp \" + $vars.eachCustomer.currentItem.revenueAtRisk + \"/tahun, lewat SLA \" +\n                $vars.eachCustomer.currentItem.hoursOverdue + \" jam. Prioritaskan penanganan.\""
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "34294aa8-b4d3-4d8c-815c-979e26acab01"
+    },
+    {
+      "id": "agentContext",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "agentContext",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n          const c = $vars.eachCustomer.currentItem;\n          return {\n            name: c.customerName, plan: c.servicePlan, fee: String(c.monthlyFee), city: c.city,\n            tenure: String(c.tenureMonths), contractLeft: String(c.contractMonthsLeft),\n            outages: String(c.outages30d), packetLoss: String(c.avgPacketLoss), latency: String(c.avgLatencyMs),\n            complaints: String(c.complaints30d), lastComplaint: c.lastComplaint || \"-\",\n            ticket: c.overdueTicketCode === \"\" ? \"tidak ada\" :\n              c.overdueTicketCode + \" (\" + c.overdueTicketCategory + \", lewat SLA \" + c.hoursOverdue + \" jam, sudah dieskalasi ke NOC)\",\n            score: String(c.churnScore), level: c.riskLevel, reasons: c.reasons\n          };\n        "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "plan": {
+              "type": "string"
+            },
+            "fee": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "tenure": {
+              "type": "string"
+            },
+            "contractLeft": {
+              "type": "string"
+            },
+            "outages": {
+              "type": "string"
+            },
+            "packetLoss": {
+              "type": "string"
+            },
+            "latency": {
+              "type": "string"
+            },
+            "complaints": {
+              "type": "string"
+            },
+            "lastComplaint": {
+              "type": "string"
+            },
+            "ticket": {
+              "type": "string"
+            },
+            "score": {
+              "type": "string"
+            },
+            "level": {
+              "type": "string"
+            },
+            "reasons": {
+              "type": "string"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "f78f87df-1ab5-41ad-b81b-cdf5a794c090"
+    },
+    {
+      "id": "recommend",
+      "type": "uipath.agent.autonomous",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "recommend",
+        "icon": "autonomous-agent"
+      },
+      "inputs": {
+        "systemPrompt": "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin (misalnya 'tidak akan ada gangguan lagi'). Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. Return a result conforming to the output schema. riskSummary: 1-2 kalimat ringkasan risiko. recommendedAction: langkah retensi yang disarankan untuk tim. offer: satu penawaran sesuai kebijakan, spesifik dan singkat. followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan offer; maksimal 90 kata, tanpa tanda tangan nama orang.",
+        "userPrompt": "Nama: {{ $vars.agentContext.output.name }}\nPaket: {{ $vars.agentContext.output.plan }} (Rp {{ $vars.agentContext.output.fee }}/bulan)\nKota: {{ $vars.agentContext.output.city }}\nLama berlangganan: {{ $vars.agentContext.output.tenure }} bulan, sisa kontrak: {{ $vars.agentContext.output.contractLeft }} bulan\nGangguan 30 hari: {{ $vars.agentContext.output.outages }}, packet loss: {{ $vars.agentContext.output.packetLoss }}%, latency: {{ $vars.agentContext.output.latency }} ms\nKeluhan 30 hari: {{ $vars.agentContext.output.complaints }}, keluhan terakhir: {{ $vars.agentContext.output.lastComplaint }}\nTiket lewat SLA: {{ $vars.agentContext.output.ticket }}\nSkor churn: {{ $vars.agentContext.output.score }} ({{ $vars.agentContext.output.level }})\nAlasan: {{ $vars.agentContext.output.reasons }}",
+        "model": "anthropic.claude-sonnet-5",
+        "mode": "standard",
+        "temperature": 1,
+        "maxTokenPerResponse": 16384,
+        "maxIterations": 25,
+        "isConversational": false,
+        "guardrails": [],
+        "name": "recommend",
+        "agentInputVariables": [
+          {
+            "id": "agentContext__output__name",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.name"
+          },
+          {
+            "id": "agentContext__output__plan",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.plan"
+          },
+          {
+            "id": "agentContext__output__fee",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.fee"
+          },
+          {
+            "id": "agentContext__output__city",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.city"
+          },
+          {
+            "id": "agentContext__output__tenure",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.tenure"
+          },
+          {
+            "id": "agentContext__output__contractLeft",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.contractLeft"
+          },
+          {
+            "id": "agentContext__output__outages",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.outages"
+          },
+          {
+            "id": "agentContext__output__packetLoss",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.packetLoss"
+          },
+          {
+            "id": "agentContext__output__latency",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.latency"
+          },
+          {
+            "id": "agentContext__output__complaints",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.complaints"
+          },
+          {
+            "id": "agentContext__output__lastComplaint",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.lastComplaint"
+          },
+          {
+            "id": "agentContext__output__ticket",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.ticket"
+          },
+          {
+            "id": "agentContext__output__score",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.score"
+          },
+          {
+            "id": "agentContext__output__level",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.level"
+          },
+          {
+            "id": "agentContext__output__reasons",
+            "type": "string",
+            "binding": "=js:$vars.agentContext.output.reasons"
+          }
+        ],
+        "agentOutputVariables": [
+          {
+            "id": "riskSummary",
+            "type": "string"
+          },
+          {
+            "id": "recommendedAction",
+            "type": "string"
+          },
+          {
+            "id": "offer",
+            "type": "string"
+          },
+          {
+            "id": "followUpMessage",
+            "type": "string"
+          }
+        ],
+        "source": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
+        "modelSkipsTemperature": true
+      },
+      "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "2542bea2-7a3b-4bd2-95e7-72791e95b68c"
+    },
+    {
+      "id": "markPending",
+      "type": "core.datafabric.update",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "markPending",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "recordSource": "byId",
+          "recordId": "=js:$vars.openCase.output.Id",
+          "fieldUpdates": [
+            {
+              "field": "CaseStatus",
+              "value": "Pending Approval"
+            },
+            {
+              "field": "RecommendedAction",
+              "value": "=js:$vars.recommend.output.recommendedAction"
+            },
+            {
+              "field": "OfferDetail",
+              "value": "=js:$vars.recommend.output.offer"
+            },
+            {
+              "field": "FollowUpMessage",
+              "value": "=js:$vars.recommend.output.followUpMessage"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "7579a088-9e4e-4330-a871-dc9a6fc8911f"
+    },
+    {
+      "id": "retentionReview",
+      "type": "uipath.human-in-the-loop",
+      "typeVersion": "1.7",
+      "display": {
+        "label": "retentionReview",
+        "icon": "users"
+      },
+      "inputs": {
+        "type": "quick",
+        "title": "ChurnShield: review retention offer",
+        "priority": "High",
+        "recipient": {
+          "channels": [
+            "Email",
+            "ActionCenter"
+          ],
+          "connections": {},
+          "assignee": {
+            "type": "group"
+          }
+        },
+        "schema": {
+          "schemaId": "1cf6364d-3e9a-50ba-8477-f593ae4f9283",
+          "fields": [
+            {
+              "id": "customer",
+              "label": "Pelanggan",
+              "type": "string",
+              "direction": "input",
+              "binding": "=js:$vars.eachCustomer.currentItem.customerCode + \" - \" + $vars.eachCustomer.currentItem.customerName + \" (\" + $vars.eachCustomer.currentItem.servicePlan + \", \" + $vars.eachCustomer.currentItem.city + \")\""
+            },
+            {
+              "id": "churnScore",
+              "label": "Skor churn",
+              "type": "number",
+              "direction": "input",
+              "binding": "vars.eachCustomer.currentItem.churnScore"
+            },
+            {
+              "id": "riskLevel",
+              "label": "Level risiko",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.eachCustomer.currentItem.riskLevel"
+            },
+            {
+              "id": "revenueAtRisk",
+              "label": "Revenue at risk (Rp/tahun)",
+              "type": "number",
+              "direction": "input",
+              "binding": "vars.eachCustomer.currentItem.revenueAtRisk"
+            },
+            {
+              "id": "reasons",
+              "label": "Alasan",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.eachCustomer.currentItem.reasons"
+            },
+            {
+              "id": "riskSummary",
+              "label": "Ringkasan AI",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.recommend.output.riskSummary"
+            },
+            {
+              "id": "recommendedAction",
+              "label": "Rekomendasi tindakan",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.recommend.output.recommendedAction"
+            },
+            {
+              "id": "offer",
+              "label": "Penawaran (boleh diedit)",
+              "type": "string",
+              "direction": "inOut",
+              "binding": "vars.recommend.output.offer"
+            },
+            {
+              "id": "followUpMessage",
+              "label": "Pesan follow-up (boleh diedit)",
+              "type": "string",
+              "direction": "inOut",
+              "binding": "vars.recommend.output.followUpMessage"
+            },
+            {
+              "id": "reviewerNote",
+              "label": "Catatan reviewer",
+              "type": "string",
+              "direction": "output",
+              "variable": "vars.reviewerNote"
+            }
+          ],
+          "outcomes": [
+            {
+              "id": "approve-offer",
+              "name": "Approve Offer",
+              "type": "string",
+              "isPrimary": true,
+              "action": "Continue"
+            },
+            {
+              "id": "no-action",
+              "name": "No Action",
+              "type": "string",
+              "isPrimary": false,
+              "action": "Continue"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "Task result data",
+          "source": "=result",
+          "var": "output",
+          "properties": {
+            "offer": {
+              "type": "string"
+            },
+            "followUpMessage": {
+              "type": "string"
+            },
+            "reviewerNote": {
+              "type": "string"
+            },
+            "Action": {
+              "type": "string",
+              "enum": [
+                "Approve Offer",
+                "No Action"
+              ],
+              "default": "Approve Offer"
+            }
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "Task completion status",
+          "source": "=result.Action",
+          "var": "status",
+          "enum": [
+            "Approve Offer",
+            "No Action"
+          ],
+          "default": "Approve Offer"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "a27b9712-1f90-452a-a418-83a3196e3154"
+    },
+    {
+      "id": "approveCase",
+      "type": "core.datafabric.update",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "approveCase",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "recordSource": "byId",
+          "recordId": "=js:$vars.openCase.output.Id",
+          "fieldUpdates": [
+            {
+              "field": "Decision",
+              "value": "Approved"
+            },
+            {
+              "field": "CaseStatus",
+              "value": "Follow-up Ready"
+            },
+            {
+              "field": "OfferDetail",
+              "value": "=js:$vars.retentionReview.output.offer"
+            },
+            {
+              "field": "FollowUpMessage",
+              "value": "=js:$vars.retentionReview.output.followUpMessage"
+            },
+            {
+              "field": "ReviewerNote",
+              "value": "=js:$vars.retentionReview.output.reviewerNote"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "4be26059-d67a-441a-abde-fcb976c1ffd2"
+    },
+    {
+      "id": "closeCase",
+      "type": "core.datafabric.update",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "closeCase",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "recordSource": "byId",
+          "recordId": "=js:$vars.openCase.output.Id",
+          "fieldUpdates": [
+            {
+              "field": "Decision",
+              "value": "No Action"
+            },
+            {
+              "field": "CaseStatus",
+              "value": "Closed - No Action"
+            },
+            {
+              "field": "ReviewerNote",
+              "value": "=js:$vars.retentionReview.output.reviewerNote"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "fff32e71-d978-446a-b8ca-81f92d09f407"
+    },
+    {
+      "id": "readRunCases",
+      "type": "core.datafabric.read",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "readRunCases",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "resultMode": "multiple",
+          "_recordLimit": 1000,
+          "_sort": {
+            "field": "RevenueAtRisk",
+            "direction": "desc"
+          },
+          "_filters": [
+            {
+              "field": "RunId",
+              "operator": "=",
+              "value": "=js:$vars.newRun.output"
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record queried by this node, or the matching records under \"results\"",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "uniqueId": "cd3a90ef-88be-4721-a731-4b95bff4dbb6"
+    },
+    {
+      "id": "buildReport",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "buildReport",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "\n      const cases = $vars.readRunCases.output.results || [];\n      const p = $vars.prioritize.output;\n      const approved = cases.filter((c) => c.Decision === \"Approved\");\n      const noAction = cases.filter((c) => c.Decision === \"No Action\");\n      const escalated = cases.filter((c) => c.TicketEscalated === true);\n      const protectedRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);\n      const rp = (n) => \"Rp \" + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n      const summary = \"ChurnShield \" + $vars.newRun.output + \": \" + p.scoredCount + \" pelanggan dinilai (\" +\n        $vars.scoringUsed + \"), \" + p.highRiskCount + \" berisiko tinggi dengan revenue at risk \" + rp(p.highRiskRevenue) +\n        \"/tahun. \" + cases.length + \" kasus diproses: \" + escalated.length + \" tiket dieskalasi, \" + approved.length +\n        \" penawaran disetujui (\" + rp(protectedRevenue) + \"/tahun dilindungi), \" + noAction.length + \" tanpa tindakan.\" +\n        ($vars.scoringNote ? \" Catatan: \" + $vars.scoringNote + \".\" : \"\");\n      return {\n        summary: summary,\n        report: {\n          runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,\n          customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,\n          highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,\n          casesProcessed: cases.length, ticketsEscalated: escalated.length,\n          offersApproved: approved.length, noAction: noAction.length, revenueProtected: protectedRevenue,\n          cases: cases.map((c) => ({\n            customer: c.CustomerCode + \" \" + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,\n            revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,\n            status: c.CaseStatus, offer: c.OfferDetail\n          }))\n        }\n      };\n    "
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "properties": {
+            "summary": {
+              "type": "string"
+            },
+            "report": {
+              "type": "object"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "5efd70ee-2451-4eb5-8552-21024b666d68"
+    },
+    {
+      "id": "end",
+      "type": "core.control.end",
+      "typeVersion": "1.0",
+      "display": {
+        "label": "End",
+        "icon": "circle-check"
+      },
+      "inputs": {},
+      "outputs": {
+        "runId": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.newRun.output",
+            "fieldType": "string"
+          },
+          "var": "runId"
+        },
+        "scoringModeUsed": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.scoringUsed",
+            "fieldType": "string"
+          },
+          "var": "scoringModeUsed"
+        },
+        "summary": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.buildReport.output.summary",
+            "fieldType": "string"
+          },
+          "var": "summary"
+        },
+        "customersScored": {
+          "type": "number",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.prioritize.output.scoredCount",
+            "fieldType": "number"
+          },
+          "var": "customersScored"
+        },
+        "highRiskCount": {
+          "type": "number",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.prioritize.output.highRiskCount",
+            "fieldType": "number"
+          },
+          "var": "highRiskCount"
+        },
+        "revenueAtRisk": {
+          "type": "number",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.prioritize.output.highRiskRevenue",
+            "fieldType": "number"
+          },
+          "var": "revenueAtRisk"
+        },
+        "report": {
+          "type": "object",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.buildReport.output.report",
+            "fieldType": "object"
+          },
+          "var": "report"
+        },
+        "cfgThreshold": {
+          "type": "number",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.cfgThreshold",
+            "fieldType": "number"
+          },
+          "var": "cfgThreshold"
+        },
+        "cfgTopN": {
+          "type": "number",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.cfgTopN",
+            "fieldType": "number"
+          },
+          "var": "cfgTopN"
+        },
+        "cfgMode": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.cfgMode",
+            "fieldType": "string"
+          },
+          "var": "cfgMode"
+        },
+        "cfgModelUrl": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.cfgModelUrl",
+            "fieldType": "string"
+          },
+          "var": "cfgModelUrl"
+        },
+        "scored": {
+          "type": "array",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.scored",
+            "fieldType": "array"
+          },
+          "var": "scored"
+        },
+        "scoringUsed": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.scoringUsed",
+            "fieldType": "string"
+          },
+          "var": "scoringUsed"
+        },
+        "scoringNote": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.scoringNote",
+            "fieldType": "string"
+          },
+          "var": "scoringNote"
+        }
+      },
+      "uniqueId": "79535833-47f5-4eaf-992e-09d41f258402"
+    },
+    {
+      "id": "dailyRun",
+      "type": "core.trigger.scheduled",
+      "typeVersion": "1.2",
+      "display": {
+        "label": "Scheduled trigger",
+        "icon": "calendar-clock"
+      },
+      "inputs": {
+        "entryPointId": "e4f91248-0102-400e-8000-e5fb9f970102",
+        "timerType": "timeCycle",
+        "timerValue": "0 0 7 * * ?"
+      },
+      "uniqueId": "373a3181-8a11-47f0-8baf-280d533288d5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_0",
+      "sourceNodeId": "start",
+      "sourcePort": "output",
+      "targetNodeId": "newRun",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_1",
+      "sourceNodeId": "newRun",
+      "sourcePort": "success",
+      "targetNodeId": "readCustomers",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_2",
+      "sourceNodeId": "newRun",
+      "sourcePort": "success",
+      "targetNodeId": "readTickets",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_3",
+      "sourceNodeId": "readCustomers",
+      "sourcePort": "output",
+      "targetNodeId": "ingest",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_4",
+      "sourceNodeId": "readTickets",
+      "sourcePort": "output",
+      "targetNodeId": "ingest",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_5",
+      "sourceNodeId": "ingest",
+      "sourcePort": "output",
+      "targetNodeId": "buildFeatures",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_6",
+      "sourceNodeId": "buildFeatures",
+      "sourcePort": "success",
+      "targetNodeId": "scoreRules",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_7",
+      "sourceNodeId": "scoreRules",
+      "sourcePort": "success",
+      "targetNodeId": "useExternalModel",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_8",
+      "sourceNodeId": "useExternalModel",
+      "sourcePort": "true",
+      "targetNodeId": "callModel",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_9",
+      "sourceNodeId": "callModel",
+      "sourcePort": "error",
+      "targetNodeId": "modelFallback",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_10",
+      "sourceNodeId": "callModel",
+      "sourcePort": "default",
+      "targetNodeId": "mergeModelScores",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_11",
+      "sourceNodeId": "mergeModelScores",
+      "sourcePort": "success",
+      "targetNodeId": "prioritize",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_12",
+      "sourceNodeId": "useExternalModel",
+      "sourcePort": "false",
+      "targetNodeId": "prioritize",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_13",
+      "sourceNodeId": "prioritize",
+      "sourcePort": "success",
+      "targetNodeId": "eachCustomer",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_14",
+      "sourceNodeId": "eachCustomer",
+      "sourcePort": "start",
+      "targetNodeId": "openCase",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_15",
+      "sourceNodeId": "openCase",
+      "sourcePort": "output",
+      "targetNodeId": "hasOverdueTicket",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_16",
+      "sourceNodeId": "hasOverdueTicket",
+      "sourcePort": "true",
+      "targetNodeId": "escalateTicket",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_17",
+      "sourceNodeId": "escalateTicket",
+      "sourcePort": "output",
+      "targetNodeId": "agentContext",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_18",
+      "sourceNodeId": "hasOverdueTicket",
+      "sourcePort": "false",
+      "targetNodeId": "agentContext",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_19",
+      "sourceNodeId": "agentContext",
+      "sourcePort": "success",
+      "targetNodeId": "recommend",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_20",
+      "sourceNodeId": "recommend",
+      "sourcePort": "success",
+      "targetNodeId": "markPending",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_21",
+      "sourceNodeId": "markPending",
+      "sourcePort": "output",
+      "targetNodeId": "retentionReview",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_22",
+      "sourceNodeId": "retentionReview",
+      "sourcePort": "outcome-approve-offer",
+      "targetNodeId": "approveCase",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_23",
+      "sourceNodeId": "retentionReview",
+      "sourcePort": "outcome-no-action",
+      "targetNodeId": "closeCase",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_24",
+      "sourceNodeId": "approveCase",
+      "sourcePort": "output",
+      "targetNodeId": "eachCustomer",
+      "targetPort": "continue"
+    },
+    {
+      "id": "edge_25",
+      "sourceNodeId": "closeCase",
+      "sourcePort": "output",
+      "targetNodeId": "eachCustomer",
+      "targetPort": "continue"
+    },
+    {
+      "id": "edge_26",
+      "sourceNodeId": "eachCustomer",
+      "sourcePort": "success",
+      "targetNodeId": "readRunCases",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_27",
+      "sourceNodeId": "readRunCases",
+      "sourcePort": "output",
+      "targetNodeId": "buildReport",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_28",
+      "sourceNodeId": "buildReport",
+      "sourcePort": "success",
+      "targetNodeId": "end",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_29",
+      "sourceNodeId": "dailyRun",
+      "sourcePort": "output",
+      "targetNodeId": "newRun",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_30",
+      "sourceNodeId": "modelFallback",
+      "sourcePort": "success",
+      "targetNodeId": "prioritize",
+      "targetPort": "input"
+    }
+  ],
+  "definitions": [
+    {
+      "nodeType": "core.trigger.manual",
+      "version": "1.0",
+      "category": "trigger",
+      "description": "Start the process manually",
+      "tags": [
+        "trigger",
+        "start",
+        "manual"
+      ],
+      "sortOrder": 80,
+      "display": {
+        "label": "Manual trigger",
+        "icon": "play",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "showButton": true,
+              "constraints": {
+                "forbiddenTargetCategories": [
+                  "trigger"
+                ]
+              }
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:StartEvent",
+        "entryPointId": true
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "Data passed when manually triggering the process.",
+          "source": "null",
+          "var": "output"
+        }
+      },
+      "toolbarExtensions": {
+        "design": {
+          "actions": [
+            {
+              "id": "change-trigger-type",
+              "icon": "square-mouse-pointer",
+              "label": "Change trigger type"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nodeType": "core.action.script",
+      "version": "1.1",
+      "category": "data-operations",
+      "description": "Run custom JavaScript code",
+      "tags": [
+        "code",
+        "javascript",
+        "python"
+      ],
+      "sortOrder": 70,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "Script",
+        "icon": "code"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        },
+        {
+          "position": "top",
+          "customPositionAndOffsets": {
+            "right": 36,
+            "width": 22
+          },
+          "handles": [
+            {
+              "id": "timeout",
+              "label": "Timeout",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.timeLimitEnabled}",
+              "labelVisibility": "hover"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:ScriptTask"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a script function",
+            "validationSeverity": "warning"
+          }
+        },
+        "required": [
+          "script"
+        ]
+      },
+      "inputDefaults": {
+        "script": ""
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "script-properties",
+        "title": "Script configuration",
+        "sections": [
+          {
+            "id": "script",
+            "title": "Script",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.script",
+                "type": "custom",
+                "component": "script-editor",
+                "componentProps": {
+                  "language": "javascript",
+                  "returnType": "any",
+                  "validationMode": "script",
+                  "minHeight": 200,
+                  "fillPanel": true,
+                  "placeholder": " // Return any value\nreturn {\n  message: \"Web request response\",\n  data: $vars.httpRequest1.output\n};"
+                },
+                "label": "Code",
+                "description": "JavaScript expression that returns a result"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.datafabric.read",
+      "version": "1.4",
+      "category": "data",
+      "description": "Query one or more entity records from Data Fabric",
+      "tags": [
+        "datafabric",
+        "entity",
+        "data",
+        "read",
+        "query"
+      ],
+      "sortOrder": 35,
+      "display": {
+        "label": "Query entity records",
+        "icon": "layers-arrow-up-right"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:Task",
+        "debug": {
+          "runtime": "bpmnEngine"
+        }
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "entityConfig": {
+            "type": "object",
+            "properties": {
+              "entityName": {
+                "type": "string",
+                "minLength": 1,
+                "errorMessage": "An entity must be selected"
+              },
+              "resultMode": {
+                "type": "string",
+                "enum": [
+                  "single",
+                  "multiple"
+                ],
+                "description": "Whether the node queries one record or a list of records",
+                "errorMessage": "Choose whether to query one record or multiple records"
+              }
+            },
+            "required": [
+              "entityName"
+            ],
+            "errorMessage": {
+              "required": "An entity must be selected"
+            }
+          }
+        },
+        "required": [
+          "entityConfig"
+        ]
+      },
+      "inputDefaults": {
+        "entityConfig": {
+          "resultMode": "single"
+        }
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record queried by this node, or the matching records under \"results\"",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "form": {
+        "id": "read-entity-properties",
+        "title": "Query entity records configuration",
+        "sections": [
+          {
+            "id": "entity-config",
+            "title": "Entity configuration",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.entityConfig",
+                "type": "custom",
+                "component": "entity-config",
+                "label": ""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.logic.merge",
+      "version": "1.1",
+      "category": "control-flow",
+      "description": "Join parallel branches into one path",
+      "tags": [
+        "control-flow",
+        "merge"
+      ],
+      "sortOrder": 65,
+      "display": {
+        "label": "Merge",
+        "icon": "merge"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:InclusiveGateway"
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      }
+    },
+    {
+      "nodeType": "core.logic.decision",
+      "version": "1.4",
+      "category": "control-flow",
+      "description": "Branch on a true or false condition",
+      "tags": [
+        "control-flow",
+        "if",
+        "loop",
+        "switch"
+      ],
+      "sortOrder": 61,
+      "display": {
+        "label": "Decision",
+        "icon": "trending-up-down"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "true",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.trueLabel}"
+            },
+            {
+              "id": "false",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.falseLabel}"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:InclusiveGateway"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a condition"
+          },
+          "trueLabel": {
+            "type": "string"
+          },
+          "falseLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "outputDefinition": {},
+      "inputDefaults": {
+        "trueLabel": "True",
+        "falseLabel": "False"
+      },
+      "form": {
+        "id": "decision-properties",
+        "title": "Decision configuration",
+        "sections": [
+          {
+            "id": "condition",
+            "title": "Condition",
+            "fields": [
+              {
+                "name": "inputs.expression",
+                "type": "custom",
+                "component": "code-editor",
+                "componentProps": {
+                  "singleLine": true,
+                  "mode": "expression",
+                  "toggleable": false,
+                  "language": "javascript",
+                  "returnType": "boolean",
+                  "validationMode": "expression",
+                  "showVariableButton": true,
+                  "placeholder": "$vars.httpRequest1.output.statusCode >= 200 && $vars.httpRequest1.output.statusCode < 300"
+                },
+                "label": "Condition",
+                "description": "The condition must be a JavaScript expression that evaluates to true or false."
+              },
+              {
+                "name": "inputs.trueLabel",
+                "type": "text",
+                "label": "True branch label",
+                "description": "This label appears on the true branch."
+              },
+              {
+                "name": "inputs.falseLabel",
+                "type": "text",
+                "label": "False branch label",
+                "description": "This label appears on the false branch."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.action.http.v2",
+      "version": "2.6",
+      "category": "connector",
+      "description": "HTTP request with managed authentication",
+      "tags": [
+        "connector",
+        "http",
+        "api",
+        "rest",
+        "request"
+      ],
+      "sortOrder": 21,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "HTTP Request",
+        "icon": "https://cloud.uipath.com/elements_/scaleunit_/58cb4f17-4581-4130-a2ae-52448b37dc03/v3/element/elements/uipath-uipath-http/image"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input",
+              "label": ""
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "branch-{item.id}",
+              "type": "source",
+              "handleType": "output",
+              "label": "{item.name}",
+              "repeat": "inputs.branches"
+            },
+            {
+              "id": "default",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.defaultBranch.label}",
+              "visible": "{inputs.branches.length === 0 || inputs.defaultBranch.enabled !== false}"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "top",
+          "customPositionAndOffsets": {
+            "right": 36,
+            "width": 22
+          },
+          "handles": [
+            {
+              "id": "timeout",
+              "label": "Timeout",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.timeLimitEnabled}",
+              "labelVisibility": "hover"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "debug": {
+        "runtime": "bpmnEngine"
+      },
+      "model": {
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Intsvc.UnifiedHttpRequest",
+        "context": [
+          {
+            "name": "connectorKey",
+            "type": "string",
+            "value": "uipath-uipath-http"
+          },
+          {
+            "name": "objectName",
+            "type": "string",
+            "value": "http-request"
+          },
+          {
+            "name": "connection",
+            "type": "string",
+            "value": "<bindings.uipath-uipath-http connection>"
+          },
+          {
+            "name": "folderKey",
+            "type": "string",
+            "value": "<bindings.FolderKey>"
+          },
+          {
+            "name": "activityConfigurationVersion",
+            "type": "string",
+            "value": "v1"
+          },
+          {
+            "name": "metadata",
+            "body": {
+              "telemetryData": {
+                "connectorKey": "uipath-uipath-http",
+                "connectorName": "HTTP Request"
+              },
+              "inputMetadata": {},
+              "errorState": {
+                "hasError": true
+              }
+            },
+            "type": "json"
+          }
+        ],
+        "expansion": {
+          "processLevelVariables": [
+            {
+              "id": "{nodeId}.output",
+              "name": "output",
+              "type": "jsonSchema",
+              "elementId": "{nodeId}",
+              "custom": true
+            },
+            {
+              "condition": "hasEdgeFromHandle('error')",
+              "id": "{nodeId}.error",
+              "name": "error",
+              "type": "jsonSchema",
+              "elementId": "{nodeId}",
+              "custom": true
+            }
+          ],
+          "nodes": [
+            {
+              "id": "{nodeId}",
+              "type": "bpmn:SubProcess",
+              "replaceOriginal": true,
+              "data": {
+                "label": "{node.data.label}",
+                "isExpanded": true,
+                "model": {
+                  "serviceType": "BPMN.Variables",
+                  "subprocessVariables": {
+                    "inputOutputs": [
+                      {
+                        "id": "response",
+                        "name": "response",
+                        "type": "jsonSchema",
+                        "variableType": "inputOutput"
+                      },
+                      {
+                        "id": "error",
+                        "name": "error",
+                        "type": "jsonSchema",
+                        "variableType": "inputOutput"
+                      }
+                    ]
+                  },
+                  "outputs": [
+                    {
+                      "name": "output",
+                      "type": "jsonSchema",
+                      "source": "=vars.response",
+                      "var": "{nodeId}.output",
+                      "custom": true
+                    },
+                    {
+                      "name": "error",
+                      "type": "jsonSchema",
+                      "source": "=vars.error",
+                      "var": "{nodeId}.error",
+                      "custom": true
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                {
+                  "id": "_Implicit_StartEvent_{nodeId}",
+                  "type": "bpmn:StartEvent",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "label": "HTTP Request Start"
+                  }
+                },
+                {
+                  "id": "_Implicit_HttpTask_{nodeId}",
+                  "type": "bpmn:SendTask",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "propagate": {
+                    "detail": true,
+                    "retry": {
+                      "condition": "node.data.inputs.retryCount > 0",
+                      "maxRetryCount": "node.data.inputs.retryCount",
+                      "retryBackoff": "node.data.inputs.timeout",
+                      "retryBackoffDefault": "PT1S",
+                      "retryAllErrors": "true",
+                      "retryBackoffType": "Static"
+                    }
+                  },
+                  "data": {
+                    "label": "{node.data.label}",
+                    "model": {
+                      "serviceType": "Intsvc.UnifiedHttpRequest",
+                      "context": [
+                        {
+                          "name": "connectorKey",
+                          "type": "string",
+                          "value": "uipath-uipath-http"
+                        },
+                        {
+                          "name": "objectName",
+                          "type": "string",
+                          "value": "http-request"
+                        },
+                        {
+                          "name": "connection",
+                          "type": "string",
+                          "value": "<bindings.uipath-uipath-http connection>"
+                        },
+                        {
+                          "name": "folderKey",
+                          "type": "string",
+                          "value": "<bindings.FolderKey>"
+                        },
+                        {
+                          "name": "activityConfigurationVersion",
+                          "type": "string",
+                          "value": "v1"
+                        },
+                        {
+                          "name": "metadata",
+                          "body": {
+                            "telemetryData": {
+                              "connectorKey": "uipath-uipath-http",
+                              "connectorName": "HTTP Request"
+                            },
+                            "inputMetadata": {},
+                            "errorState": {
+                              "hasError": true
+                            }
+                          },
+                          "type": "json"
+                        }
+                      ],
+                      "outputs": [
+                        {
+                          "name": "response",
+                          "type": "json",
+                          "source": "=response",
+                          "var": "response",
+                          "internal": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "id": "_Implicit_Gateway_{nodeId}",
+                  "type": "bpmn:ExclusiveGateway",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "condition": "node.data.inputs.branches.length > 0",
+                  "data": {
+                    "label": "Response branch",
+                    "defaultFlowId": "_Implicit_Edge__Implicit_Gateway_{nodeId}__Implicit_EndEvent_Default_{nodeId}"
+                  }
+                },
+                {
+                  "forEach": "node.data.inputs.branches",
+                  "id": "_Implicit_EndEvent_{branchName}_{nodeId}",
+                  "type": "bpmn:EndEvent",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "label": "{branch.name}"
+                  }
+                },
+                {
+                  "id": "_Implicit_EndEvent_Default_{nodeId}",
+                  "type": "bpmn:EndEvent",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "label": "{defaultBranchLabel}"
+                  }
+                },
+                {
+                  "condition": "hasEdgeFromHandle('error')",
+                  "id": "_Implicit_EndEvent_Failure_{nodeId}",
+                  "type": "bpmn:EndEvent",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "label": "Failure",
+                    "model": {
+                      "serviceType": "BPMN.Variables",
+                      "outputs": [
+                        {
+                          "name": "error",
+                          "type": "boolean",
+                          "source": "=true",
+                          "var": "error",
+                          "internal": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "condition": "hasEdgeFromHandle('error')",
+                  "id": "_Implicit_BoundaryError_{nodeId}",
+                  "type": "bpmn:BoundaryEvent",
+                  "parentId": "{nodeId}",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "label": "Error",
+                    "cancelActivity": false,
+                    "attachedToId": "_Implicit_HttpTask_{nodeId}",
+                    "eventDefinition": {
+                      "type": "bpmn:ErrorEventDefinition",
+                      "id": "_Implicit_BoundaryError_{nodeId}_Error"
+                    },
+                    "model": {
+                      "outputs": [
+                        {
+                          "name": "Error",
+                          "type": "jsonSchema",
+                          "source": "=Error",
+                          "var": "response",
+                          "internal": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "edges": [
+                {
+                  "id": "_Implicit_Edge__Implicit_StartEvent_{nodeId}__Implicit_HttpTask_{nodeId}",
+                  "source": "_Implicit_StartEvent_{nodeId}",
+                  "target": "_Implicit_HttpTask_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {}
+                },
+                {
+                  "condition": "node.data.inputs.branches.length === 0",
+                  "id": "_Implicit_Edge__Implicit_HttpTask_{nodeId}__Implicit_EndEvent_Default_{nodeId}",
+                  "source": "_Implicit_HttpTask_{nodeId}",
+                  "target": "_Implicit_EndEvent_Default_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {}
+                },
+                {
+                  "condition": "node.data.inputs.branches.length > 0",
+                  "id": "_Implicit_Edge__Implicit_HttpTask_{nodeId}__Implicit_Gateway_{nodeId}",
+                  "source": "_Implicit_HttpTask_{nodeId}",
+                  "target": "_Implicit_Gateway_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {}
+                },
+                {
+                  "forEach": "node.data.inputs.branches",
+                  "condition": "node.data.inputs.branches.length > 0",
+                  "id": "_Implicit_Edge__Implicit_Gateway_{nodeId}__Implicit_EndEvent_{branchName}_{nodeId}",
+                  "source": "_Implicit_Gateway_{nodeId}",
+                  "target": "_Implicit_EndEvent_{branchName}_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {
+                    "conditionExpression": "{branch.conditionExpression}",
+                    "label": "{branch.name}"
+                  }
+                },
+                {
+                  "condition": "node.data.inputs.branches.length > 0",
+                  "id": "_Implicit_Edge__Implicit_Gateway_{nodeId}__Implicit_EndEvent_Default_{nodeId}",
+                  "source": "_Implicit_Gateway_{nodeId}",
+                  "target": "_Implicit_EndEvent_Default_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {
+                    "label": "{defaultBranchLabel}"
+                  }
+                },
+                {
+                  "condition": "hasEdgeFromHandle('error')",
+                  "id": "_Implicit_Edge__Implicit_BoundaryError_{nodeId}__Implicit_EndEvent_Failure_{nodeId}",
+                  "source": "_Implicit_BoundaryError_{nodeId}",
+                  "target": "_Implicit_EndEvent_Failure_{nodeId}",
+                  "type": "bpmn:SequenceFlow",
+                  "data": {}
+                }
+              ]
+            },
+            {
+              "id": "_Implicit_PostSubprocessGateway_{nodeId}",
+              "type": "bpmn:ExclusiveGateway",
+              "condition": "(node.data.inputs.branches.length > 0 || hasEdgeFromHandle('error')) && originalEdges.length > 0",
+              "parentId": null,
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "data": {
+                "label": "Post-Subprocess Branch"
+              }
+            }
+          ],
+          "edges": [
+            {
+              "condition": "(node.data.inputs.branches.length > 0 || hasEdgeFromHandle('error')) && originalEdges.length > 0",
+              "id": "_Implicit_Edge_{nodeId}__Implicit_PostSubprocessGateway_{nodeId}",
+              "source": "{nodeId}",
+              "target": "_Implicit_PostSubprocessGateway_{nodeId}",
+              "type": "bpmn:SequenceFlow",
+              "data": {}
+            },
+            {
+              "forEach": "node.data.inputs.branches",
+              "condition": "node.data.inputs.branches.length > 0",
+              "matchOriginalEdgeByHandle": "branch-{branch.id}",
+              "preserveEdgeId": true,
+              "source": "_Implicit_PostSubprocessGateway_{nodeId}",
+              "type": "bpmn:SequenceFlow",
+              "data": {
+                "conditionExpression": "{branch.conditionExpression}",
+                "label": "{branch.name}"
+              }
+            },
+            {
+              "condition": "node.data.inputs.branches.length > 0 || hasEdgeFromHandle('error')",
+              "matchOriginalEdgeByHandle": "default",
+              "preserveEdgeId": true,
+              "source": "_Implicit_PostSubprocessGateway_{nodeId}",
+              "type": "bpmn:SequenceFlow",
+              "data": {
+                "label": "{defaultBranchLabel}"
+              }
+            },
+            {
+              "condition": "hasEdgeFromHandle('error')",
+              "matchOriginalEdgeByHandle": "error",
+              "preserveEdgeId": true,
+              "source": "_Implicit_PostSubprocessGateway_{nodeId}",
+              "type": "bpmn:SequenceFlow",
+              "data": {
+                "conditionExpression": "=js:vars.{nodeId}.error || vars.{nodeId}.output?.statusCode >= 400",
+                "label": "Error"
+              }
+            },
+            {
+              "condition": "node.data.inputs.branches.length === 0 && !hasEdgeFromHandle('error')",
+              "matchOriginalEdgeByHandle": "default",
+              "preserveEdgeId": true,
+              "source": "{nodeId}",
+              "type": "bpmn:SequenceFlow"
+            }
+          ]
+        }
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "conditionExpression": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "defaultBranch": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              }
+            }
+          },
+          "timeout": {
+            "type": "string",
+            "pattern": "^P(?!$)(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
+            "errorMessage": {
+              "pattern": "Timeout must be in ISO 8601 duration format (e.g., PT15M, PT1H, P1D)"
+            }
+          },
+          "retryCount": {
+            "type": "number"
+          }
+        }
+      },
+      "inputDefaults": {
+        "branches": [],
+        "defaultBranch": {
+          "enabled": true,
+          "label": ""
+        },
+        "timeout": "PT15M",
+        "retryCount": 0
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "HTTP response object",
+          "source": "=response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP status code"
+              },
+              "headers": {
+                "type": "object",
+                "description": "Response headers"
+              },
+              "body": {
+                "description": "Response body"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "http-v2-properties",
+        "title": "HTTP Request",
+        "metadata": {
+          "propertyPanel": {
+            "tabs": [
+              {
+                "id": "branching",
+                "title": "Branching"
+              }
+            ],
+            "sectionTabs": {
+              "branches": "branching",
+              "advanced": "advanced"
+            }
+          }
+        },
+        "sections": [
+          {
+            "id": "http-config",
+            "title": "Configuration",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.dapHttpToolbar",
+                "type": "custom",
+                "component": "dap-http-toolbar",
+                "label": ""
+              },
+              {
+                "label": "",
+                "name": "inputs.detail",
+                "type": "custom",
+                "component": "dap-config",
+                "componentProps": {
+                  "connectorDetail": {
+                    "isAppActivity": false,
+                    "packageId": 196648,
+                    "svgIconUrl": "icons/0dad78c9d04c245b126d8edb4c451aa8a0d395d34731cf5702441f6284c70ccc.svg",
+                    "displayName": "HTTP Request",
+                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.22.0.0, Culture=neutral, PublicKeyToken=null",
+                    "description": "Use HTTP requests to interact with APIs via the selected connector and connection configuration.",
+                    "category": "",
+                    "activityColor": "#E56D5C",
+                    "configuration": "{\"connectorKey\":\"uipath-uipath-http\",\"objectName\":\"http-request\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\"}",
+                    "uiPathActivityTypeId": "5c4cc855-b42a-37e6-b910-de8588998fce",
+                    "isExperimental": false,
+                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-uipath-http-HTTP-Request",
+                    "isEnabled": true,
+                    "targetPlatform": "CrossPlatform",
+                    "isAdvanced": false,
+                    "isRestricted": false,
+                    "tags": [
+                      ""
+                    ]
+                  },
+                  "fixedValueEditors": {
+                    "body": "json"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "branches",
+            "title": "Branches",
+            "collapsible": true,
+            "defaultExpanded": false,
+            "fields": [
+              {
+                "name": "inputs.branches",
+                "type": "custom",
+                "component": "http-branch-editor",
+                "label": "Response branches",
+                "description": "Define conditional branches based on response status or properties",
+                "componentProps": {
+                  "expressionValidationFields": [
+                    {
+                      "subPath": "conditionExpression",
+                      "validationMode": "expression",
+                      "expectedType": "boolean"
+                    }
+                  ],
+                  "defaultBranchRow": true
+                }
+              }
+            ]
+          },
+          {
+            "id": "advanced",
+            "title": "Advanced",
+            "collapsible": true,
+            "defaultExpanded": false,
+            "fields": [
+              {
+                "name": "inputs.timeout",
+                "type": "text",
+                "label": "Timeout",
+                "description": "ISO 8601 duration format (for example, PT15M for 15 minutes, PT1H for 1 hour)"
+              },
+              {
+                "name": "inputs.retryCount",
+                "type": "number",
+                "label": "Retry count",
+                "description": "Number of times to retry on failure"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.logic.loop",
+      "supportsErrorHandling": true,
+      "version": "2.4",
+      "category": "control-flow",
+      "description": "Iterate over a collection of items",
+      "tags": [
+        "control-flow",
+        "loop",
+        "iteration"
+      ],
+      "sortOrder": 63,
+      "display": {
+        "label": "Loop",
+        "icon": "repeat",
+        "shape": "container",
+        "description": "Execute a sequence of actions repeatedly for each item in a collection"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "boundary": "outer",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "boundary": "outer",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        },
+        {
+          "position": "left",
+          "boundary": "inner",
+          "handles": [
+            {
+              "id": "start",
+              "label": "start",
+              "type": "source",
+              "handleType": "output"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "boundary": "inner",
+          "handles": [
+            {
+              "id": "continue",
+              "label": "continue",
+              "type": "target",
+              "handleType": "input"
+            },
+            {
+              "id": "break",
+              "label": "break",
+              "type": "target",
+              "handleType": "input",
+              "visible": "inputs.breakEnabled"
+            }
+          ]
+        },
+        {
+          "position": "top",
+          "boundary": "outer",
+          "customPositionAndOffsets": {
+            "right": 36,
+            "width": 22
+          },
+          "handles": [
+            {
+              "id": "timeout",
+              "label": "Timeout",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.timeLimitEnabled}",
+              "labelVisibility": "hover"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:SubProcess"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "array"
+          },
+          "parallel": {
+            "type": "boolean"
+          },
+          "completionCondition": {
+            "type": "string"
+          },
+          "breakEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "collection"
+        ]
+      },
+      "inputDefaults": {
+        "collection": [],
+        "parallel": false,
+        "completionCondition": "",
+        "breakEnabled": false
+      },
+      "outputDefinition": {
+        "currentItem": {
+          "type": "any",
+          "description": "The current item being iterated in the loop",
+          "source": "=loopContext.currentItem",
+          "var": "currentItem",
+          "scope": "internal"
+        },
+        "currentIteration": {
+          "type": "number",
+          "description": "The current iteration number (1-based)",
+          "source": "=loopContext.currentIteration",
+          "var": "currentIteration",
+          "scope": "internal"
+        },
+        "collection": {
+          "type": "array",
+          "description": "The collection being iterated over",
+          "source": "=loopContext.collection",
+          "var": "collection",
+          "scope": "internal"
+        },
+        "output": {
+          "type": "array",
+          "description": "Aggregated results from all loop iterations",
+          "source": "=loopContext.output",
+          "var": "output",
+          "scope": "external"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "loop-properties",
+        "title": "Loop configuration",
+        "sections": [
+          {
+            "id": "iteration",
+            "title": "Iteration",
+            "fields": [
+              {
+                "name": "inputs.collection",
+                "type": "custom",
+                "component": "code-editor",
+                "label": "Collection",
+                "description": "The loop runs once for each item in this array or collection.",
+                "componentProps": {
+                  "singleLine": true,
+                  "mode": "expression",
+                  "toggleable": false,
+                  "placeholder": "$vars.scriptTask1.output",
+                  "showVariableButton": true,
+                  "language": "javascript",
+                  "expectedType": "array",
+                  "validationMode": "expression"
+                }
+              },
+              {
+                "name": "inputs.parallel",
+                "type": "switch",
+                "label": "Parallel",
+                "description": "The loop runs iterations at the same time."
+              },
+              {
+                "name": "inputs.completionCondition",
+                "type": "custom",
+                "component": "code-editor",
+                "label": "Break on condition",
+                "description": "The loop exits early when this condition becomes true after an iteration completes.",
+                "componentProps": {
+                  "singleLine": true,
+                  "mode": "expression",
+                  "toggleable": false,
+                  "placeholder": "$vars.processedCount >= 5",
+                  "showVariableButton": true,
+                  "alwaysIncludeSelf": true,
+                  "returnType": "boolean",
+                  "validationMode": "expression",
+                  "language": "javascript"
+                }
+              },
+              {
+                "name": "inputs.breakEnabled",
+                "type": "switch",
+                "label": "Show break handle",
+                "description": "Nodes inside the loop can exit through a break handle."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.datafabric.create",
+      "version": "1.3",
+      "category": "data",
+      "description": "Create an entity record in Data Fabric",
+      "tags": [
+        "datafabric",
+        "entity",
+        "data",
+        "create",
+        "insert",
+        "write"
+      ],
+      "sortOrder": 37,
+      "display": {
+        "label": "Create entity record",
+        "icon": "layers-arrow-up-right"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:Task",
+        "debug": {
+          "runtime": "bpmnEngine"
+        }
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "entityConfig": {
+            "type": "object",
+            "properties": {
+              "entityName": {
+                "type": "string",
+                "minLength": 1,
+                "errorMessage": "An entity must be selected"
+              },
+              "fieldValues": {
+                "type": "array",
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "pattern": "\\S"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "\\S"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "jsExpression"
+                            },
+                            "expression": {
+                              "type": "string",
+                              "pattern": "\\S"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "expression"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "value"
+                  ]
+                },
+                "errorMessage": "Set a value for at least one field"
+              }
+            },
+            "required": [
+              "entityName",
+              "fieldValues"
+            ],
+            "errorMessage": {
+              "required": {
+                "entityName": "An entity must be selected",
+                "fieldValues": "Set a value for at least one field"
+              }
+            }
+          }
+        },
+        "required": [
+          "entityConfig"
+        ]
+      },
+      "inputDefaults": {
+        "entityConfig": {}
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record created by this node",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "form": {
+        "id": "create-entity-properties",
+        "title": "Create entity record configuration",
+        "sections": [
+          {
+            "id": "entity-config",
+            "title": "Entity configuration",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.entityConfig",
+                "type": "custom",
+                "component": "create-entity-config",
+                "label": ""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.datafabric.update",
+      "version": "1.3",
+      "category": "data",
+      "description": "Update an entity record in Data Fabric",
+      "tags": [
+        "datafabric",
+        "entity",
+        "data",
+        "update",
+        "write"
+      ],
+      "sortOrder": 36,
+      "display": {
+        "label": "Update entity record",
+        "icon": "layers-arrow-up-right"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:Task",
+        "debug": {
+          "runtime": "bpmnEngine"
+        }
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "entityConfig": {
+            "type": "object",
+            "properties": {
+              "entityName": {
+                "type": "string",
+                "minLength": 1,
+                "errorMessage": "An entity must be selected"
+              },
+              "recordId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "const": "jsExpression"
+                      },
+                      "expression": {
+                        "type": "string",
+                        "pattern": "\\S"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "expression"
+                    ]
+                  }
+                ]
+              },
+              "readEntityNodeId": {
+                "type": "string"
+              },
+              "fieldUpdates": {
+                "type": "array",
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "required": [
+                    "field"
+                  ]
+                },
+                "errorMessage": "Select a field to update"
+              }
+            },
+            "required": [
+              "entityName",
+              "fieldUpdates"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "recordSource": {
+                      "const": "byId"
+                    }
+                  },
+                  "required": [
+                    "recordSource"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "recordId"
+                  ],
+                  "properties": {
+                    "recordId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "\\S"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "jsExpression"
+                            },
+                            "expression": {
+                              "type": "string",
+                              "pattern": "\\S"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "expression"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "errorMessage": "A record ID is required"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "recordSource": {
+                      "const": "fromRead"
+                    }
+                  },
+                  "required": [
+                    "recordSource"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "readEntityNodeId"
+                  ],
+                  "properties": {
+                    "readEntityNodeId": {
+                      "type": "string",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "errorMessage": "Select a Query entity records node"
+                }
+              }
+            ],
+            "errorMessage": {
+              "required": {
+                "entityName": "An entity must be selected",
+                "fieldUpdates": "Select a field to update"
+              }
+            }
+          }
+        },
+        "required": [
+          "entityConfig"
+        ]
+      },
+      "inputDefaults": {
+        "entityConfig": {}
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "form": {
+        "id": "update-entity-properties",
+        "title": "Update entity record configuration",
+        "sections": [
+          {
+            "id": "entity-config",
+            "title": "Entity configuration",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.entityConfig",
+                "type": "custom",
+                "component": "update-entity-config",
+                "label": ""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "uipath.agent.autonomous",
+      "version": "1.4",
+      "category": "agent",
+      "description": "AI agent that completes tasks autonomously",
+      "tags": [
+        "agentic",
+        "ai",
+        "autonomous",
+        "agent"
+      ],
+      "sortOrder": 10,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "Autonomous agent",
+        "icon": "autonomous-agent",
+        "shape": "rectangle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "top",
+          "handles": [
+            {
+              "id": "escalation",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Escalations",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.escalation"
+                  },
+                  {
+                    "nodeType": "uipath.agent.resource.escalation.*"
+                  }
+                ],
+                "validationMessage": "Only Agent Escalation nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": []
+                }
+              }
+            }
+          ]
+        },
+        {
+          "position": "bottom",
+          "handles": [
+            {
+              "id": "context",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Context",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.context.*"
+                  }
+                ],
+                "validationMessage": "Only Context resource nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": [],
+                  "refreshOnFocus": "context",
+                  "createNewActions": [
+                    {
+                      "label": "Create new Context",
+                      "icon": "plus",
+                      "description": "Opens in a new tab",
+                      "urlTemplate": "/{org}/agents_/indexes/add",
+                      "categoryId": "context-grounding-indexes"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "tool",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Tools",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.tool.*"
+                  }
+                ],
+                "validationMessage": "Only Tool resource nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": [],
+                  "refreshOnFocus": "mcp",
+                  "createNewActions": [
+                    {
+                      "label": "Create new MCP server",
+                      "icon": "plus",
+                      "urlTemplate": "/{org}/{tenant}/orchestrator_/mcp",
+                      "categoryId": "agent.tool.mcp"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output",
+              "isDefaultForType": true
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        },
+        {
+          "position": "top",
+          "customPositionAndOffsets": {
+            "right": 36,
+            "width": 22
+          },
+          "handles": [
+            {
+              "id": "timeout",
+              "label": "Timeout",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.timeLimitEnabled}",
+              "labelVisibility": "hover"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "form": {
+        "id": "settings-form",
+        "title": "Agent settings",
+        "metadata": {
+          "propertyPanel": {
+            "sectionTabs": {
+              "section-advanced": "advanced"
+            }
+          }
+        },
+        "mode": "onChange",
+        "reValidateMode": "onChange",
+        "sections": [
+          {
+            "id": "section-1",
+            "title": "Agent settings",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.mode",
+                "type": "custom",
+                "component": "agent-harness-picker",
+                "label": ""
+              },
+              {
+                "name": "inputs.model",
+                "type": "custom",
+                "component": "agent-model-picker",
+                "label": "Model",
+                "componentProps": {
+                  "placeholder": "gpt-4o-2024-11-20"
+                }
+              },
+              {
+                "name": "inputs.systemPrompt",
+                "type": "custom",
+                "component": "prompt-editor",
+                "label": "System prompt",
+                "componentProps": {
+                  "multiline": true,
+                  "minRows": 4,
+                  "maxRows": 20,
+                  "placeholder": "Enter the system prompt"
+                }
+              },
+              {
+                "name": "inputs.userPrompt",
+                "type": "custom",
+                "component": "prompt-editor",
+                "label": "User prompt",
+                "componentProps": {
+                  "multiline": true,
+                  "minRows": 3,
+                  "maxRows": 15,
+                  "placeholder": "Enter the user prompt"
+                }
+              }
+            ]
+          },
+          {
+            "id": "section-advanced",
+            "title": "Advanced settings",
+            "collapsible": true,
+            "defaultExpanded": false,
+            "fields": [
+              {
+                "name": "inputs.temperature",
+                "type": "slider",
+                "label": "Temperature",
+                "defaultValue": 0,
+                "min": 0,
+                "max": 1,
+                "step": 0.01
+              },
+              {
+                "name": "inputs.maxTokenPerResponse",
+                "type": "slider",
+                "label": "Maximum tokens per response",
+                "defaultValue": 16384,
+                "min": 0,
+                "step": 1,
+                "maxRef": {
+                  "fromField": "inputs.modelMaxTokens",
+                  "fallback": 16384
+                }
+              },
+              {
+                "name": "inputs.maxIterations",
+                "type": "slider",
+                "label": "Maximum iterations",
+                "defaultValue": 25,
+                "min": 1,
+                "max": 100,
+                "step": 1
+              }
+            ]
+          },
+          {
+            "id": "guardrails",
+            "collapsible": false,
+            "fields": [
+              {
+                "name": "inputs.guardrails",
+                "type": "custom",
+                "component": "guardrails-editor",
+                "label": "",
+                "componentProps": {
+                  "toolName": "Agent",
+                  "scope": "Agent"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "systemPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "System prompt is required"
+            }
+          },
+          "userPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "User prompt is required"
+            }
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "Model is required"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "advanced"
+            ]
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maxTokenPerResponse": {
+            "type": "number",
+            "minimum": 0
+          },
+          "modelMaxTokens": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxIterations": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "guardrails": {
+            "type": "array"
+          },
+          "agentInputVariables": {
+            "type": "array"
+          },
+          "agentOutputVariables": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "systemPrompt",
+          "userPrompt",
+          "model"
+        ]
+      },
+      "inputDefaults": {
+        "systemPrompt": "You are an agentic assistant.",
+        "userPrompt": "What is the current date?",
+        "model": "gpt-4o-2024-11-20",
+        "mode": "standard",
+        "agentInputVariables": [],
+        "agentOutputVariables": [
+          {
+            "id": "content",
+            "type": "string"
+          }
+        ]
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "Agent response",
+          "var": "output",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The agent response text"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "model": {
+        "source": true,
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Orchestrator.StartInlineAgentJob",
+        "version": "v2",
+        "context": [
+          {
+            "name": "_label",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "entryPoint",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
+      }
+    },
+    {
+      "nodeType": "uipath.human-in-the-loop",
+      "version": "1.7",
+      "category": "human-task",
+      "description": "Pause the process and wait for human task completion",
+      "tags": [
+        "human-task",
+        "hitl",
+        "human-in-the-loop",
+        "approval"
+      ],
+      "sortOrder": 50,
+      "display": {
+        "label": "Human Task — Quick Form / App",
+        "icon": "users",
+        "shape": "square"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "outcome-completed",
+              "label": "Completed",
+              "type": "source",
+              "handleType": "output",
+              "showButton": true,
+              "constraints": {
+                "forbiddenTargetCategories": [
+                  "trigger"
+                ]
+              }
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:UserTask",
+        "serviceType": "Actions.HITL"
+      },
+      "inputDefaults": {
+        "type": "quick",
+        "schema": {
+          "fields": [],
+          "outcomes": [
+            {
+              "id": "submit",
+              "name": "Submit",
+              "type": "string",
+              "isPrimary": true,
+              "action": "Continue"
+            }
+          ]
+        },
+        "recipient": {
+          "channels": [
+            "Email",
+            "ActionCenter"
+          ],
+          "connections": {},
+          "assignee": {
+            "type": "user"
+          }
+        }
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "Task result data",
+          "source": "=result",
+          "var": "output"
+        },
+        "status": {
+          "type": "string",
+          "description": "Task completion status (completed, cancelled, timeout)",
+          "source": "=result.Action",
+          "var": "status"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "hitl-properties",
+        "title": "Human task configuration",
+        "sections": [
+          {
+            "id": "task-type",
+            "title": "Task Type",
+            "collapsible": false,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.type",
+                "type": "select",
+                "label": "Type",
+                "options": [
+                  {
+                    "label": "Quick Form",
+                    "value": "quick"
+                  },
+                  {
+                    "label": "Custom App",
+                    "value": "custom"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "assignment",
+            "title": "Assignment criteria",
+            "collapsible": false,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.recipient",
+                "type": "custom",
+                "component": "hitl-assignee-selector",
+                "label": "",
+                "description": ""
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "title": "Schema",
+            "collapsible": true,
+            "defaultExpanded": false,
+            "fields": [
+              {
+                "name": "inputs.schema",
+                "type": "custom",
+                "component": "hitl-schema-editor",
+                "label": "Task Schema",
+                "description": "Define the input and output parameters for this task"
+              }
+            ]
+          },
+          {
+            "id": "delivery",
+            "title": "Delivery channels",
+            "collapsible": false,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.recipient",
+                "type": "custom",
+                "component": "hitl-channel-selector",
+                "label": "Delivery Channels",
+                "description": "Select where the task should be sent"
+              }
+            ]
+          },
+          {
+            "id": "additional-properties",
+            "title": "Additional properties",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.title",
+                "type": "text",
+                "label": "Task title"
+              },
+              {
+                "name": "inputs.priority",
+                "type": "select",
+                "label": "Priority",
+                "options": [
+                  {
+                    "label": "Low",
+                    "value": "Low"
+                  },
+                  {
+                    "label": "Medium",
+                    "value": "Medium"
+                  },
+                  {
+                    "label": "High",
+                    "value": "High"
+                  }
+                ]
+              },
+              {
+                "name": "inputs.labels",
+                "type": "text",
+                "label": "Labels",
+                "placeholder": "Comma-separated (e.g. finance,approval)"
+              },
+              {
+                "name": "inputs.memorySpace",
+                "type": "custom",
+                "component": "hitl-memory-space-picker",
+                "label": "Memory space",
+                "description": "Attach a memory space so this task's inputs and outputs are written to it"
+              }
+            ]
+          },
+          {
+            "id": "app",
+            "title": "Custom Approval App",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.app",
+                "type": "custom",
+                "component": "hitl-app-picker",
+                "label": "Action App",
+                "description": "Select the coded action app for this task"
+              },
+              {
+                "name": "inputs.appInputBindings",
+                "type": "custom",
+                "component": "hitl-app-inputs",
+                "label": "Inputs",
+                "description": "Map app inputs to expressions/variables"
+              }
+            ]
+          }
+        ]
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      }
+    },
+    {
+      "nodeType": "core.control.end",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Mark the end of a process path",
+      "tags": [
+        "control-flow",
+        "end",
+        "finish",
+        "complete"
+      ],
+      "sortOrder": 66,
+      "display": {
+        "label": "End",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent"
+      }
+    },
+    {
+      "nodeType": "core.trigger.scheduled",
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "version": "1.2",
+      "category": "trigger",
+      "description": "Start the process on a schedule or interval",
+      "tags": [
+        "trigger",
+        "start",
+        "event",
+        "schedule",
+        "timer",
+        "cron"
+      ],
+      "sortOrder": 81,
+      "display": {
+        "label": "Scheduled trigger",
+        "icon": "calendar-clock",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "showButton": true,
+              "constraints": {
+                "forbiddenTargetCategories": [
+                  "trigger"
+                ]
+              }
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:StartEvent",
+        "entryPointId": true,
+        "eventDefinition": "bpmn:TimerEventDefinition",
+        "values": {
+          "timerType": "inputs.timerType",
+          "timerValue": "inputs.timerValue"
+        }
+      },
+      "toolbarExtensions": {
+        "design": {
+          "actions": [
+            {
+              "id": "change-trigger-type",
+              "icon": "square-mouse-pointer",
+              "label": "Change trigger type"
+            }
+          ]
+        }
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "timerType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timerValue": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?:R\\d*\\/(?:P(?:[1-9][0-9]{0,3}Y|(?:[1-9]|1[0-2])M|(?:[1-9]|[1-4][0-9]|5[0-2])W|(?:[1-9]|[12][0-9]|3[01])D|T(?:(?:[1-9]|1[0-9]|2[0-3])H|(?:[1-9]|[1-5][0-9])M|(?:[1-9]|[1-5][0-9])S))(?:\\/\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:\\d{2})?)?)?|\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:\\d{2})?)?\\/P(?:[1-9][0-9]{0,3}Y|(?:[1-9]|1[0-2])M|(?:[1-9]|[1-4][0-9]|5[0-2])W|(?:[1-9]|[12][0-9]|3[01])D|T(?:(?:[1-9]|1[0-9]|2[0-3])H|(?:[1-9]|[1-5][0-9])M|(?:[1-9]|[1-5][0-9])S)))|(?:\\d+[LW]?|[A-Z]{3}|LW|L|W|\\?|\\*)(?:[,/#-](?:\\d+[LW]?|[A-Z]{3}|LW|L|W|\\?|\\*))*(?:\\s+(?:\\d+[LW]?|[A-Z]{3}|LW|L|W|\\?|\\*)(?:[,/#-](?:\\d+[LW]?|[A-Z]{3}|LW|L|W|\\?|\\*))*){5,6})$",
+            "errorMessage": {
+              "minLength": "Cycle expression is required",
+              "pattern": "Cycle expression must be either an ISO 8601 repeating interval (e.g., R/PT1H, R/P1D, R/2026-05-14T09:00:00Z/P1W) or a Quartz cron expression (e.g., 0 0 */1 * * ? *)"
+            }
+          }
+        },
+        "required": [
+          "timerValue"
+        ]
+      },
+      "inputDefaults": {
+        "timerType": "timeCycle",
+        "timerValue": "R/PT1H"
+      },
+      "form": {
+        "id": "scheduled-trigger-properties",
+        "title": "Scheduled trigger",
+        "sections": [
+          {
+            "id": "schedule",
+            "title": "Schedule",
+            "collapsible": false,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.timerValue",
+                "type": "custom",
+                "component": "iso-expression-field",
+                "label": "",
+                "placeholder": "R/PT1H",
+                "componentProps": {
+                  "expressionType": "repeating-interval"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "variables": {
+    "globals": [
+      {
+        "id": "riskThreshold",
+        "direction": "in",
+        "type": "number",
+        "defaultValue": 0.6,
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "topN",
+        "direction": "in",
+        "type": "number",
+        "defaultValue": 5,
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "scoringMode",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "rules",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "externalModelUrl",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "runId",
+        "direction": "out",
+        "type": "string"
+      },
+      {
+        "id": "scoringModeUsed",
+        "direction": "out",
+        "type": "string"
+      },
+      {
+        "id": "summary",
+        "direction": "out",
+        "type": "string"
+      },
+      {
+        "id": "customersScored",
+        "direction": "out",
+        "type": "number"
+      },
+      {
+        "id": "highRiskCount",
+        "direction": "out",
+        "type": "number"
+      },
+      {
+        "id": "revenueAtRisk",
+        "direction": "out",
+        "type": "number"
+      },
+      {
+        "id": "report",
+        "direction": "out",
+        "type": "object"
+      },
+      {
+        "id": "cfgThreshold",
+        "direction": "inout",
+        "type": "number",
+        "defaultValue": 0.6
+      },
+      {
+        "id": "cfgTopN",
+        "direction": "inout",
+        "type": "number",
+        "defaultValue": 5
+      },
+      {
+        "id": "cfgMode",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": "rules"
+      },
+      {
+        "id": "cfgModelUrl",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": ""
+      },
+      {
+        "id": "scored",
+        "direction": "inout",
+        "type": "array",
+        "defaultValue": []
+      },
+      {
+        "id": "scoringUsed",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": "rules"
+      },
+      {
+        "id": "scoringNote",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": ""
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start.output",
+        "type": "object",
+        "description": "Data passed when manually triggering the workflow.",
+        "binding": {
+          "nodeId": "start",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "newRun.output",
+        "type": "string",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "newRun",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "newRun.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "newRun",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "readCustomers.output",
+        "type": "jsonSchema",
+        "description": "Entity record queried by this node, or the matching records under \"results\"",
+        "binding": {
+          "nodeId": "readCustomers",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readTickets.output",
+        "type": "jsonSchema",
+        "description": "Entity record queried by this node, or the matching records under \"results\"",
+        "binding": {
+          "nodeId": "readTickets",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "buildFeatures.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "buildFeatures",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "buildFeatures.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "buildFeatures",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "scoreRules.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "scoreRules",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "scoreRules.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "scoreRules",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "callModel.output",
+        "type": "object",
+        "description": "HTTP response object",
+        "binding": {
+          "nodeId": "callModel",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "callModel.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "callModel",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "modelFallback.output",
+        "type": "string",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "modelFallback",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "modelFallback.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "modelFallback",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "mergeModelScores.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "mergeModelScores",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "mergeModelScores.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "mergeModelScores",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "prioritize.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "prioritize",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "prioritize.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "prioritize",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "eachCustomer.currentItem",
+        "type": "any",
+        "description": "The current item being iterated in the loop",
+        "binding": {
+          "nodeId": "eachCustomer",
+          "outputId": "currentItem"
+        }
+      },
+      {
+        "id": "eachCustomer.currentIteration",
+        "type": "number",
+        "description": "The current iteration number (1-based)",
+        "binding": {
+          "nodeId": "eachCustomer",
+          "outputId": "currentIteration"
+        }
+      },
+      {
+        "id": "eachCustomer.collection",
+        "type": "array",
+        "description": "The collection being iterated over",
+        "binding": {
+          "nodeId": "eachCustomer",
+          "outputId": "collection"
+        }
+      },
+      {
+        "id": "eachCustomer.output",
+        "type": "array",
+        "description": "Aggregated results from all loop iterations",
+        "binding": {
+          "nodeId": "eachCustomer",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "eachCustomer.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "eachCustomer",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "openCase.output",
+        "type": "jsonSchema",
+        "description": "Entity record created by this node",
+        "binding": {
+          "nodeId": "openCase",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "escalateTicket.output",
+        "type": "jsonSchema",
+        "description": "Entity record after the update",
+        "binding": {
+          "nodeId": "escalateTicket",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "agentContext.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "agentContext",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "agentContext.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "agentContext",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "recommend.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "riskSummary": {
+              "type": "string"
+            },
+            "recommendedAction": {
+              "type": "string"
+            },
+            "offer": {
+              "type": "string"
+            },
+            "followUpMessage": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Agent response",
+        "binding": {
+          "nodeId": "recommend",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "recommend.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "recommend",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "markPending.output",
+        "type": "jsonSchema",
+        "description": "Entity record after the update",
+        "binding": {
+          "nodeId": "markPending",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "retentionReview.output",
+        "type": "object",
+        "description": "Task result data",
+        "binding": {
+          "nodeId": "retentionReview",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "retentionReview.status",
+        "type": "string",
+        "description": "Task completion status",
+        "binding": {
+          "nodeId": "retentionReview",
+          "outputId": "status"
+        }
+      },
+      {
+        "id": "approveCase.output",
+        "type": "jsonSchema",
+        "description": "Entity record after the update",
+        "binding": {
+          "nodeId": "approveCase",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "closeCase.output",
+        "type": "jsonSchema",
+        "description": "Entity record after the update",
+        "binding": {
+          "nodeId": "closeCase",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readRunCases.output",
+        "type": "jsonSchema",
+        "description": "Entity record queried by this node, or the matching records under \"results\"",
+        "binding": {
+          "nodeId": "readRunCases",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "buildReport.output",
+        "type": "object",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "buildReport",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "buildReport.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "buildReport",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "end.runId",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "runId"
+        }
+      },
+      {
+        "id": "end.scoringModeUsed",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "scoringModeUsed"
+        }
+      },
+      {
+        "id": "end.summary",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "summary"
+        }
+      },
+      {
+        "id": "end.customersScored",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "customersScored"
+        }
+      },
+      {
+        "id": "end.highRiskCount",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "highRiskCount"
+        }
+      },
+      {
+        "id": "end.revenueAtRisk",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "revenueAtRisk"
+        }
+      },
+      {
+        "id": "end.report",
+        "type": "object",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "report"
+        }
+      },
+      {
+        "id": "end.cfgThreshold",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "cfgThreshold"
+        }
+      },
+      {
+        "id": "end.cfgTopN",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "cfgTopN"
+        }
+      },
+      {
+        "id": "end.cfgMode",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "cfgMode"
+        }
+      },
+      {
+        "id": "end.cfgModelUrl",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "cfgModelUrl"
+        }
+      },
+      {
+        "id": "end.scored",
+        "type": "array",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "scored"
+        }
+      },
+      {
+        "id": "end.scoringUsed",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "scoringUsed"
+        }
+      },
+      {
+        "id": "end.scoringNote",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "scoringNote"
+        }
+      },
+      {
+        "id": "retentionReview.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "retentionReview",
+          "outputId": "error"
+        }
+      }
+    ],
+    "variableUpdates": {
+      "scoreRules": [
+        {
+          "variableId": "scored",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.scoreRules.output.scored",
+            "fieldType": "array"
+          }
+        },
+        {
+          "variableId": "scoringUsed",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "\"rules\"",
+            "fieldType": "string"
+          }
+        }
+      ],
+      "modelFallback": [
+        {
+          "variableId": "scoringNote",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.modelFallback.output",
+            "fieldType": "string"
+          }
+        }
+      ],
+      "mergeModelScores": [
+        {
+          "variableId": "scored",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.mergeModelScores.output.scored",
+            "fieldType": "array"
+          }
+        },
+        {
+          "variableId": "scoringUsed",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "\"external\"",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "scoringNote",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.mergeModelScores.output.note",
+            "fieldType": "string"
+          }
+        }
+      ],
+      "start": [
+        {
+          "variableId": "cfgThreshold",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.start.output.riskThreshold",
+            "fieldType": "number"
+          }
+        },
+        {
+          "variableId": "cfgTopN",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.start.output.topN",
+            "fieldType": "number"
+          }
+        },
+        {
+          "variableId": "cfgMode",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.start.output.scoringMode",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "cfgModelUrl",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.start.output.externalModelUrl",
+            "fieldType": "string"
+          }
+        }
+      ]
+    }
+  },
+  "bindings": [
+    {
+      "id": "bUipathuipathhttpConnection",
+      "name": "uipath-uipath-http connection",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "",
+      "default": "ImplicitConnection",
+      "propertyAttribute": "ConnectionId"
+    },
+    {
+      "id": "bUipathuipathhttpFolderKey",
+      "name": "FolderKey",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "",
+      "propertyAttribute": "FolderKey"
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "position": {
+          "x": 256,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 256,
+          "y": 144
+        }
+      },
+      "newRun": {
+        "position": {
+          "x": 448,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 448,
+          "y": 144
+        }
+      },
+      "readCustomers": {
+        "position": {
+          "x": 640,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 640,
+          "y": 128
+        }
+      },
+      "readTickets": {
+        "position": {
+          "x": 640,
+          "y": 320
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 640,
+          "y": 320
+        }
+      },
+      "ingest": {
+        "position": {
+          "x": 832,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 832,
+          "y": 128
+        }
+      },
+      "buildFeatures": {
+        "position": {
+          "x": 1024,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1024,
+          "y": 128
+        }
+      },
+      "scoreRules": {
+        "position": {
+          "x": 1216,
+          "y": 112
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1216,
+          "y": 112
+        }
+      },
+      "useExternalModel": {
+        "position": {
+          "x": 1408,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1408,
+          "y": 96
+        }
+      },
+      "callModel": {
+        "position": {
+          "x": 1600,
+          "y": -48
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1600,
+          "y": -48
+        }
+      },
+      "modelFallback": {
+        "position": {
+          "x": 1792,
+          "y": -32
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1792,
+          "y": -32
+        }
+      },
+      "mergeModelScores": {
+        "position": {
+          "x": 1792,
+          "y": -224
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1792,
+          "y": -224
+        }
+      },
+      "prioritize": {
+        "position": {
+          "x": 1984,
+          "y": -48
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1984,
+          "y": -48
+        }
+      },
+      "eachCustomer": {
+        "position": {
+          "x": 2176,
+          "y": -144
+        },
+        "size": {
+          "width": 1696,
+          "height": 368
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 2176,
+          "y": -144
+        }
+      },
+      "openCase": {
+        "position": {
+          "x": 144,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 144,
+          "y": 160
+        }
+      },
+      "hasOverdueTicket": {
+        "position": {
+          "x": 304,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 304,
+          "y": 160
+        }
+      },
+      "escalateTicket": {
+        "position": {
+          "x": 464,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 464,
+          "y": 128
+        }
+      },
+      "agentContext": {
+        "position": {
+          "x": 624,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 624,
+          "y": 160
+        }
+      },
+      "recommend": {
+        "position": {
+          "x": 784,
+          "y": 160
+        },
+        "size": {
+          "width": 288,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 784,
+          "y": 160
+        }
+      },
+      "markPending": {
+        "position": {
+          "x": 1136,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1136,
+          "y": 160
+        }
+      },
+      "retentionReview": {
+        "position": {
+          "x": 1296,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1296,
+          "y": 160
+        }
+      },
+      "approveCase": {
+        "position": {
+          "x": 1456,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1456,
+          "y": 96
+        }
+      },
+      "closeCase": {
+        "position": {
+          "x": 1456,
+          "y": 224
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1456,
+          "y": 224
+        }
+      },
+      "readRunCases": {
+        "position": {
+          "x": 3968,
+          "y": -112
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 3968,
+          "y": -112
+        }
+      },
+      "buildReport": {
+        "position": {
+          "x": 4160,
+          "y": -112
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 4160,
+          "y": -112
+        }
+      },
+      "end": {
+        "position": {
+          "x": 4352,
+          "y": -128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 4352,
+          "y": -128
+        }
+      },
+      "dailyRun": {
+        "position": {
+          "x": 256,
+          "y": 336
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 256,
+          "y": 336
+        }
+      }
+    }
+  }
+}
