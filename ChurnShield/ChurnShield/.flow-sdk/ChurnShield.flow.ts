@@ -4,9 +4,14 @@
  * daily schedule / manual run
  *   -> read customers || read open tickets (Data Fabric, parallel)
  *   -> build features -> scoring slot (rules by default; external ML endpoint with fallback)
- *   -> prioritize by churn score x revenue at risk (threshold, top N)
+ *   -> read existing cases (parallel with the above)
+ *   -> prioritize by churn score x revenue at risk (threshold, top N),
+ *      skipping customers with an open case or contacted within the cooldown
+ *   -> flag approvals waiting past the SLA
  *   -> per customer (parallel): open case -> escalate overdue ticket
- *        -> AI retention recommendation -> human approval (edit / approve / no action)
+ *        -> AI retention recommendation -> policy guardrail check
+ *        -> human approval (edit / approve / no action)
+ *        -> approved version re-checked; out-of-policy offers need a supervisor exception
  *        -> case updated
  *   -> run report from the recorded cases
  *
@@ -21,6 +26,41 @@ import {
 const MODEL = "anthropic.claude-sonnet-5";
 const item = (field: string) => v(`eachCustomer.currentItem.${field}`);
 
+// FR-11 offer policy guardrail. Deterministic, applied to the AI draft AND to the reviewer's edited version.
+// Policy: one offer type only — discount <= 30% for <= 3 months, OR free speed upgrade <= 3 months,
+// OR 1 free month only when <= 1 contract month is left; a priority technician visit may be added.
+// No promises that cannot be guaranteed. (Kept free of backslashes so it embeds safely in script code.)
+const POLICY_FN = `
+  function checkPolicy(offer, message, contractLeft) {
+    const o = String(offer || "").toLowerCase();
+    const m = String(message || "").toLowerCase();
+    const issues = [];
+    if (o.trim() === "") issues.push("penawaran kosong");
+    const pct = (o.match(/[0-9]+ *%/g) || []).map((x) => parseInt(x, 10));
+    pct.forEach((p) => { if (p > 30) issues.push("diskon " + p + "% melebihi batas 30%"); });
+    const months = (o.match(/[0-9]+ *bulan/g) || []).map((x) => parseInt(x, 10));
+    months.forEach((n) => { if (n > 3) issues.push("durasi " + n + " bulan melebihi batas 3 bulan"); });
+    let hasDiscount = false, hasUpgrade = false, hasFreeMonth = false;
+    o.split(/[+;]| dan | serta |disertai|ditambah|plus /).forEach((part) => {
+      if (part.indexOf("upgrade") >= 0 || part.indexOf("kecepatan") >= 0) { hasUpgrade = true; return; }
+      if (part.indexOf("%") >= 0 || part.indexOf("diskon") >= 0 || part.indexOf("potongan") >= 0) hasDiscount = true;
+      const free = part.match(/gratis *([0-9]+) *bulan|([0-9]+) *bulan *gratis|free *([0-9]+) *month/);
+      if (free) {
+        hasFreeMonth = true;
+        const n = parseInt(free[1] || free[2] || free[3], 10);
+        if (n > 1) issues.push("gratis " + n + " bulan melebihi batas 1 bulan");
+        if (Number(contractLeft) > 1) issues.push("bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak " + contractLeft + " bulan)");
+      }
+    });
+    if ([hasDiscount, hasUpgrade, hasFreeMonth].filter(Boolean).length > 1) issues.push("menggabungkan lebih dari satu jenis penawaran");
+    const banned = ["dijamin", "tidak akan ada gangguan", "tidak akan terjadi gangguan", "bebas gangguan", "pasti stabil", "100% stabil", "uang kembali"];
+    banned.forEach((w) => { if (o.indexOf(w) >= 0 || m.indexOf(w) >= 0) issues.push("janji yang tidak bisa dijamin: '" + w + "'"); });
+    const words = m.split(" ").filter((x) => x.trim() !== "").length;
+    if (words > 150) issues.push("pesan follow-up terlalu panjang (" + words + " kata, maks 150)");
+    return { status: issues.length ? "Violation" : "Compliant", issues: issues.length ? issues.join("; ") : "sesuai kebijakan" };
+  }
+`;
+
 export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .schemaVersion("1.9")
   .name("ChurnShield")
@@ -29,11 +69,15 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .var("cfgTopN", types.number, 5)
   .var("cfgMode", types.string, "rules")
   .var("cfgModelUrl", types.string, "")
+  .var("cfgCooldownDays", types.number, 30)
+  .var("cfgSlaHours", types.number, 24)
   .input({
     riskThreshold: { type: types.number, default: 0.6, shared: "cfgThreshold" },
     topN: { type: types.number, default: 5, shared: "cfgTopN" },
     scoringMode: { type: types.string, default: "rules", shared: "cfgMode" }, // rules | external
     externalModelUrl: { type: types.string, default: "", shared: "cfgModelUrl" },
+    contactCooldownDays: { type: types.number, default: 30, shared: "cfgCooldownDays" },
+    approvalSlaHours: { type: types.number, default: 24, shared: "cfgSlaHours" },
   })
   .entryPoint("dailyRun", scheduled({ every: "0 0 7 * * ?" }))
   .output({
@@ -69,6 +113,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       entity: "CsTicket", resultMode: "multiple", limit: 1000,
       filters: [{ field: "TicketStatus", value: "Open" }],
       sort: { field: "OpenedAt" },
+    })),
+    // existing cases: duplicate protection, contact cooldown and approval SLA
+    (c) => c.step("readCases", dataFabricRead({
+      entity: "CsRetentionCase", resultMode: "multiple", limit: 1000,
+      sort: { field: "CreateTime", direction: "desc" },
     })),
   ])
 
@@ -188,19 +237,50 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         }),
   )
 
-  // FR-04 prioritization
+  // FR-04 prioritization, FR-12 no duplicate cases / contact cooldown, FR-13 approval SLA
   .step("prioritize", script({
     code: `
       const threshold = Number($vars.cfgThreshold);
       const topN = Math.max(0, Math.floor(Number($vars.cfgTopN)));
+      const now = Date.now();
+      const cooldownMs = Math.max(0, Number($vars.cfgCooldownDays)) * 86400000;
+      const slaMs = Math.max(0, Number($vars.cfgSlaHours)) * 3600000;
+      const openStatuses = ["Analyzing", "Pending Approval", "Follow-up Ready"];
+      const cases = $vars.readCases.output.results || [];
+      const blocked = {};
+      const overdue = [];
+      for (const c of cases) {
+        const age = now - new Date(c.CreateTime).getTime();
+        const open = openStatuses.indexOf(c.CaseStatus) >= 0;
+        // a supervisor-rejected offer never reached the customer, so it does not start the contact cooldown
+        const contacted = c.CaseStatus !== "Closed - Offer Rejected";
+        if (open || (contacted && age < cooldownMs)) {
+          if (!blocked[c.CustomerCode]) blocked[c.CustomerCode] = open ? "kasus " + c.CaseStatus + " (" + c.RunId + ")" : "sudah ditangani " + Math.floor(age / 86400000) + " hari lalu";
+        }
+        if (c.CaseStatus === "Pending Approval" && age >= slaMs && c.ApprovalOverdue !== true) {
+          overdue.push({ id: c.Id, customerCode: c.CustomerCode, customerName: c.CustomerName, runId: c.RunId, hoursWaiting: Math.floor(age / 3600000) });
+        }
+      }
       const high = $vars.scored.filter((r) => r.churnScore >= threshold);
       high.sort((a, b) => (b.churnScore * b.revenueAtRisk) - (a.churnScore * a.revenueAtRisk));
-      const top = high.slice(0, topN);
+      const eligible = high.filter((r) => !blocked[r.customerCode]);
+      const skipped = high.filter((r) => blocked[r.customerCode]).map((r) => ({ customer: r.customerCode + " " + r.customerName, reason: blocked[r.customerCode] }));
+      const top = eligible.slice(0, topN);
       const total = high.reduce((s, r) => s + r.revenueAtRisk, 0);
-      return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length };
+      return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length,
+        skipped: skipped, overdue: overdue };
     `,
-    returns: { top: "array", highRiskCount: "number", highRiskRevenue: "number", scoredCount: "number" },
+    returns: { top: "array", highRiskCount: "number", highRiskRevenue: "number", scoredCount: "number", skipped: "array", overdue: "array" },
   }))
+
+  // FR-13 approval SLA: cases still waiting for a reviewer past the SLA are flagged for the supervisor
+  .loop("eachOverdue", js`$vars.prioritize.output.overdue`, (body) =>
+    body.step("flagOverdue", dataFabricUpdate({
+      entity: "CsRetentionCase",
+      record: { byId: v("eachOverdue.currentItem.id") },
+      set: { ApprovalOverdue: true },
+    })),
+  )
 
   // per prioritized customer, in parallel: each one is an independent case
   .loop("eachCustomer", js`$vars.prioritize.output.top`, (body) =>
@@ -266,7 +346,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         systemPrompt:
           "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. " +
           "Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin " +
-          "(misalnya 'tidak akan ada gangguan lagi'). Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, " +
+          "(misalnya 'tidak akan ada gangguan lagi'); jangan memakai kata 'dijamin'. Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, " +
           "ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; " +
           "kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. " +
           "Return a result conforming to the output schema. " +
@@ -292,6 +372,14 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         },
         returns: { riskSummary: "string", recommendedAction: "string", offer: "string", followUpMessage: "string" },
       }))
+      // FR-11 guardrail on the AI draft: the reviewer sees the result before deciding
+      .step("policyCheck", script({
+        code: POLICY_FN + `
+          return checkPolicy($vars.recommend.output.offer, $vars.recommend.output.followUpMessage,
+            $vars.eachCustomer.currentItem.contractMonthsLeft);
+        `,
+        returns: { status: "string", issues: "string" },
+      }))
       .step("markPending", dataFabricUpdate({
         entity: "CsRetentionCase",
         record: { byId: out("openCase", "Id") },
@@ -300,6 +388,9 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           RecommendedAction: out("recommend", "recommendedAction"),
           OfferDetail: out("recommend", "offer"),
           FollowUpMessage: out("recommend", "followUpMessage"),
+          PolicyStatus: out("policyCheck", "status"),
+          PolicyIssues: out("policyCheck", "issues"),
+          ApprovalOverdue: false,
         },
       }))
 
@@ -311,11 +402,14 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           { id: "customer", label: "Pelanggan", type: "string", direction: "input",
             value: js`$vars.eachCustomer.currentItem.customerCode + " - " + $vars.eachCustomer.currentItem.customerName + " (" + $vars.eachCustomer.currentItem.servicePlan + ", " + $vars.eachCustomer.currentItem.city + ")"` },
           { id: "churnScore", label: "Skor churn", type: "number", direction: "input", value: item("churnScore") },
-          { id: "riskLevel", label: "Level risiko", type: "string", direction: "input", value: item("riskLevel") },
+          // string fields read a step output: a loop-item binding is shown literally in the task form
+          { id: "riskLevel", label: "Level risiko", type: "string", direction: "input", value: out("agentContext", "level") },
           { id: "revenueAtRisk", label: "Revenue at risk (Rp/tahun)", type: "number", direction: "input", value: item("revenueAtRisk") },
-          { id: "reasons", label: "Alasan", type: "string", direction: "input", value: item("reasons") },
+          { id: "reasons", label: "Alasan", type: "string", direction: "input", value: out("agentContext", "reasons") },
           { id: "riskSummary", label: "Ringkasan AI", type: "string", direction: "input", value: out("recommend", "riskSummary") },
           { id: "recommendedAction", label: "Rekomendasi tindakan", type: "string", direction: "input", value: out("recommend", "recommendedAction") },
+          { id: "policyResult", label: "Cek kebijakan draf AI", type: "string", direction: "input",
+            value: js`$vars.policyCheck.output.status + " - " + $vars.policyCheck.output.issues` },
           { id: "offer", label: "Penawaran (boleh diedit)", type: "string", direction: "inOut", value: out("recommend", "offer") },
           { id: "followUpMessage", label: "Pesan follow-up (boleh diedit)", type: "string", direction: "inOut", value: out("recommend", "followUpMessage") },
           { id: "reviewerNote", label: "Catatan reviewer", type: "string", direction: "output" },
@@ -325,17 +419,83 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         {
           value: "Approve Offer",
           body: (b) =>
-            b.step("approveCase", dataFabricUpdate({
-              entity: "CsRetentionCase",
-              record: { byId: out("openCase", "Id") },
-              set: {
-                Decision: "Approved",
-                CaseStatus: "Follow-up Ready",
-                OfferDetail: out("retentionReview", "offer"),
-                FollowUpMessage: out("retentionReview", "followUpMessage"),
-                ReviewerNote: out("retentionReview", "reviewerNote"),
-              },
-            })),
+            b
+              // FR-11 the version the reviewer approved is checked again: edits cannot bypass policy
+              .step("recheckPolicy", script({
+                code: POLICY_FN + `
+                  return checkPolicy($vars.retentionReview.output.offer, $vars.retentionReview.output.followUpMessage,
+                    $vars.eachCustomer.currentItem.contractMonthsLeft);
+                `,
+                returns: { status: "string", issues: "string" },
+              }))
+              .branch(
+                "offerWithinPolicy",
+                js`$vars.recheckPolicy.output.status === "Compliant"`,
+                (ok) =>
+                  ok.step("approveCase", dataFabricUpdate({
+                    entity: "CsRetentionCase",
+                    record: { byId: out("openCase", "Id") },
+                    set: {
+                      Decision: "Approved",
+                      CaseStatus: "Follow-up Ready",
+                      OfferDetail: out("retentionReview", "offer"),
+                      FollowUpMessage: out("retentionReview", "followUpMessage"),
+                      ReviewerNote: out("retentionReview", "reviewerNote"),
+                      PolicyStatus: "Compliant",
+                      PolicyIssues: "sesuai kebijakan",
+                    },
+                  })),
+                // out of policy: a supervisor must explicitly grant an exception
+                (exc) =>
+                  exc.stepSwitch("supervisorReview", hitl({
+                    title: "ChurnShield: penawaran di luar kebijakan",
+                    priority: "High",
+                    fields: [
+                      { id: "svCustomer", label: "Pelanggan", type: "string", direction: "input",
+                        value: js`$vars.eachCustomer.currentItem.customerCode + " - " + $vars.eachCustomer.currentItem.customerName` },
+                      { id: "svRevenue", label: "Revenue at risk (Rp/tahun)", type: "number", direction: "input", value: item("revenueAtRisk") },
+                      { id: "svOffer", label: "Penawaran yang disetujui reviewer", type: "string", direction: "input", value: out("retentionReview", "offer") },
+                      { id: "svIssues", label: "Pelanggaran kebijakan", type: "string", direction: "input", value: out("recheckPolicy", "issues") },
+                      { id: "svReviewerNote", label: "Catatan reviewer", type: "string", direction: "input", value: out("retentionReview", "reviewerNote") },
+                      { id: "supervisorNote", label: "Alasan keputusan supervisor", type: "string", direction: "output" },
+                    ],
+                    outcomes: ["Approve Exception", "Reject Offer"],
+                  }), [
+                    {
+                      value: "Approve Exception",
+                      body: (s) =>
+                        s.step("approveException", dataFabricUpdate({
+                          entity: "CsRetentionCase",
+                          record: { byId: out("openCase", "Id") },
+                          set: {
+                            Decision: "Approved (Exception)",
+                            CaseStatus: "Follow-up Ready",
+                            OfferDetail: out("retentionReview", "offer"),
+                            FollowUpMessage: out("retentionReview", "followUpMessage"),
+                            ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
+                            PolicyStatus: "Exception Approved",
+                            PolicyIssues: out("recheckPolicy", "issues"),
+                          },
+                        })),
+                    },
+                    {
+                      value: "Reject Offer",
+                      body: (s) =>
+                        s.step("rejectOffer", dataFabricUpdate({
+                          entity: "CsRetentionCase",
+                          record: { byId: out("openCase", "Id") },
+                          set: {
+                            Decision: "Rejected by Supervisor",
+                            CaseStatus: "Closed - Offer Rejected",
+                            OfferDetail: out("retentionReview", "offer"),
+                            ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
+                            PolicyStatus: "Violation",
+                            PolicyIssues: out("recheckPolicy", "issues"),
+                          },
+                        })),
+                    },
+                  ]),
+              ),
         },
         {
           value: "No Action",
@@ -364,15 +524,22 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     code: `
       const cases = $vars.readRunCases.output.results || [];
       const p = $vars.prioritize.output;
-      const approved = cases.filter((c) => c.Decision === "Approved");
+      const approved = cases.filter((c) => c.Decision === "Approved" || c.Decision === "Approved (Exception)");
+      const exceptions = cases.filter((c) => c.Decision === "Approved (Exception)");
+      const rejected = cases.filter((c) => c.Decision === "Rejected by Supervisor");
       const noAction = cases.filter((c) => c.Decision === "No Action");
       const escalated = cases.filter((c) => c.TicketEscalated === true);
+      const aiFlagged = cases.filter((c) => c.PolicyStatus !== "Compliant");
       const protectedRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);
       const rp = (n) => "Rp " + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
       const summary = "ChurnShield " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
         $vars.scoringUsed + "), " + p.highRiskCount + " berisiko tinggi dengan revenue at risk " + rp(p.highRiskRevenue) +
-        "/tahun. " + cases.length + " kasus diproses: " + escalated.length + " tiket dieskalasi, " + approved.length +
-        " penawaran disetujui (" + rp(protectedRevenue) + "/tahun dilindungi), " + noAction.length + " tanpa tindakan." +
+        "/tahun. " + cases.length + " kasus baru diproses: " + escalated.length + " tiket dieskalasi, " + approved.length +
+        " penawaran disetujui (" + rp(protectedRevenue) + "/tahun dilindungi" +
+        (exceptions.length ? ", " + exceptions.length + " lewat pengecualian supervisor" : "") + "), " +
+        (rejected.length ? rejected.length + " ditolak supervisor, " : "") + noAction.length + " tanpa tindakan." +
+        (p.skipped.length ? " " + p.skipped.length + " pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak." : "") +
+        (p.overdue.length ? " " + p.overdue.length + " approval lewat SLA " + $vars.cfgSlaHours + " jam ditandai untuk supervisor." : "") +
         ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "");
       return {
         summary: summary,
@@ -381,11 +548,13 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,
           highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,
           casesProcessed: cases.length, ticketsEscalated: escalated.length,
-          offersApproved: approved.length, noAction: noAction.length, revenueProtected: protectedRevenue,
+          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
+          noAction: noAction.length, revenueProtected: protectedRevenue, policyNotCompliantAtClose: aiFlagged.length,
+          skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,
           cases: cases.map((c) => ({
             customer: c.CustomerCode + " " + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,
             revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,
-            status: c.CaseStatus, offer: c.OfferDetail
+            status: c.CaseStatus, offer: c.OfferDetail, policy: c.PolicyStatus, policyIssues: c.PolicyIssues
           }))
         }
       };

@@ -17,21 +17,52 @@ an outage is fixed. Retention offers are given without a consistent rule or appr
 
 ```
 daily schedule (07:00) or manual run
-  -> read customers || read open tickets            (Data Fabric, in parallel)
+  -> read customers || read open tickets || read existing cases   (Data Fabric, in parallel)
   -> build features per customer                    (outages, packet loss, latency, complaints, overdue tickets, contract)
   -> score churn risk                               (scoring slot: rules by default, external ML model optional)
   -> prioritize: score x annual revenue at risk     (threshold 0.6, top 5)
+       skip customers with an open case or contacted in the last 30 days (no duplicate cases, no spamming)
+  -> flag approvals still waiting past the SLA (24 h) for the supervisor
   -> for each prioritized customer, in parallel:
        create retention case
        escalate the most overdue ticket to NOC      (if any)
        AI agent: risk summary, action, offer, follow-up message (Bahasa Indonesia)
+       offer policy guardrail on the AI draft       (deterministic check, result shown to the reviewer)
        human approval in Action Center              (edit offer/message, Approve Offer or No Action)
+       approved version re-checked against policy
+         within policy  -> Follow-up Ready
+         out of policy  -> supervisor task: Approve Exception or Reject Offer
        update case
   -> run report built from the recorded cases
 ```
 
 **Human in the Lead:** no customer is contacted and no offer is given without a person's approval.
 The reviewer can edit the AI's offer and message before approving; the edited version is what gets stored.
+The AI is bounded by policy: neither the AI draft nor a reviewer's edit can go out of policy without a
+supervisor explicitly approving an exception, and every exception is recorded with the reason.
+
+## Offer policy guardrail
+
+The same deterministic check runs on the AI draft and on the reviewer-approved version:
+
+| Rule | Example that is flagged |
+|---|---|
+| One offer type only (discount, OR speed upgrade, OR free month); a priority technician visit may be added | "Diskon 25% + upgrade kecepatan" |
+| Discount at most 30% | "Diskon 50%" |
+| Duration at most 3 months | "selama 6 bulan" |
+| Free month: at most 1, and only when the contract has at most 1 month left | "Gratis 2 bulan", "Gratis 1 bulan" with 6 months left |
+| No promises that cannot be guaranteed | "dijamin", "bebas gangguan", "tidak akan ada gangguan" |
+| Follow-up message at most 150 words | — |
+
+## Duplicate protection, contact cooldown and approval SLA
+
+- A customer with a case in `Analyzing`, `Pending Approval` or `Follow-up Ready` is never given a second case.
+- A customer contacted in the last `contactCooldownDays` (30) is skipped. A supervisor-rejected offer never
+  reached the customer, so it does not start the cooldown: the next run prepares a new, compliant offer.
+- Every run flags cases waiting for approval longer than `approvalSlaHours` (24) with `ApprovalOverdue = true`
+  and lists them in the report. Maestro Flow has no built-in timeout for a human task, so the open task is
+  not cancelled; it is surfaced for the supervisor.
+- The report lists every skipped customer with the reason.
 
 ## Pluggable ML scoring
 
@@ -61,7 +92,11 @@ POST <externalModelUrl>
 | Automatic ticket escalation (Data Fabric) | Working, tested |
 | AI recommendation, offer and message per customer | Working, tested |
 | Parallel human approval tasks with editable offer | Working, tested |
+| Offer policy guardrail + supervisor exception / rejection | Working, tested (AI draft, compliant edit, out-of-policy edit approved as exception, out-of-policy edit rejected) |
+| Duplicate protection, contact cooldown, approval SLA flag | Working, tested with overlapping runs |
 | Case tracking and run report | Working, tested |
+| Retention outcome (did the customer stay?) | Not tracked yet; needs the provider's billing/CRM data |
+| AI agent failure handling | Not handled: an error handler on the inline agent is refused by validation in this Flow version. An agent failure is expected to stop the run and leave that case in `Analyzing` (not tested) |
 | External model slot with fallback | Fallback path tested with an unreachable URL; no real model connected |
 | Daily schedule | Configured (07:00, Quartz cron, platform time zone); fires after deployment |
 | Sending follow-up / escalation / report emails | Not connected yet. Cases stop at `Follow-up Ready`; nothing is claimed as sent |
@@ -88,7 +123,9 @@ POST <externalModelUrl>
 1. Open `ChurnShield.uipx`, project **ChurnShield**, file `ChurnShield/ChurnShield.flow`.
 2. Run / Debug with the inputs in `sample-data/input-sample.json` (all have defaults).
 3. Open Action Center: one **ChurnShield: review retention offer** task per prioritized customer.
-   Edit the offer if needed, then choose **Approve Offer** or **No Action**.
+   Check the policy result, edit the offer if needed, then choose **Approve Offer** or **No Action**.
+   If the approved version is out of policy, a **ChurnShield: penawaran di luar kebijakan** task appears
+   for the supervisor: **Approve Exception** or **Reject Offer**.
 4. Check the `CsRetentionCase` and `CsTicket` entities and the run outputs (`summary`, `report`).
 
 ## Run inputs
@@ -99,6 +136,8 @@ POST <externalModelUrl>
 | `topN` | 5 | Customers processed per run |
 | `scoringMode` | `rules` | `rules` or `external` |
 | `externalModelUrl` | empty | Provider's churn model endpoint |
+| `contactCooldownDays` | 30 | Days before a contacted customer can get a new case |
+| `approvalSlaHours` | 24 | Hours a case may wait for approval before it is flagged |
 
 ## Tested scenarios (synthetic data, Nov 2026)
 
@@ -108,5 +147,10 @@ POST <externalModelUrl>
 | External model URL unreachable | Fallback to rules; report notes the fallback; run completed |
 | Prioritized customer without an overdue ticket | No escalation, case processed normally |
 | Threshold 1.5 | 0 cases; run completed without errors |
+| Reviewer edits offer to "Diskon 50% selama 6 bulan" | Re-check flags 2 violations; supervisor task; Approve Exception stored as `Approved (Exception)` with both notes |
+| Reviewer edits offer to "Gratis 2 bulan + upgrade kecepatan" | Re-check flags 3 violations; supervisor Reject Offer; case `Closed - Offer Rejected` |
+| Second run started while the first run's 5 tasks were still open (SLA 0 h, top 3) | The 5 customers skipped with reason; their 5 cases flagged `ApprovalOverdue`; 3 new customers processed |
+| Run after approvals and closures | 8 customers skipped (open case or cooldown); the supervisor-rejected customer picked again with a new compliant offer |
+| Policy check unit cases | 16 offer/message examples, all classified as expected |
 
 See `sample-data/output-sample.md` for a full example output.

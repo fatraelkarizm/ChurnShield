@@ -244,7 +244,7 @@ No follow-up may be sent without approval.
 
 The system shall create a retention case per prioritized customer and update its status through the run.
 
-Statuses: Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed - No Action, Failed.
+Statuses: Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed - No Action, Closed - Offer Rejected, Failed.
 
 ### FR-09: Follow-up Delivery
 
@@ -252,7 +252,26 @@ After approval, the system shall prepare the follow-up for delivery. When an ema
 
 ### FR-10: Run Report
 
-At the end of each run, the system shall produce a report with run ID, scoring mode, customers scored, high-risk customers, total revenue at risk, tickets escalated, offers approved, no-action decisions, and the list of cases.
+At the end of each run, the system shall produce a report with run ID, scoring mode, customers scored, high-risk customers, total revenue at risk, tickets escalated, offers approved, policy exceptions, offers rejected by the supervisor, no-action decisions, customers skipped (with reason), approvals past SLA, and the list of cases.
+
+### FR-11: Offer Policy Guardrail
+
+The system shall check every offer against the retention policy with a deterministic rule, both on the AI draft and on the version the reviewer approves:
+- one offer type only (discount, OR speed upgrade, OR free month); a priority technician visit may be added;
+- discount at most 30%, duration at most 3 months;
+- at most 1 free month, and only when the contract has at most 1 month left;
+- no promise that cannot be guaranteed (for example "dijamin", "bebas gangguan");
+- follow-up message at most 150 words.
+
+The result of the check on the AI draft shall be shown to the reviewer. If the approved version is out of policy, the system shall not mark it ready; it shall create a supervisor task with the violations, and the supervisor shall either approve an exception (recorded as `Approved (Exception)` with the reason) or reject the offer (`Closed - Offer Rejected`).
+
+### FR-12: Duplicate Protection and Contact Cooldown
+
+The system shall not create a case for a customer who already has a case in Analyzing, Pending Approval or Follow-up Ready, nor for a customer contacted within the contact cooldown (default 30 days). A supervisor-rejected offer does not start the cooldown, because the customer was not contacted. Skipped customers shall be listed in the run report with the reason.
+
+### FR-13: Approval SLA
+
+Each run shall flag cases that have waited for approval longer than the approval SLA (default 24 hours) and list them in the run report for the supervisor. The pending task itself stays open, because a Maestro Flow human task has no built-in timeout.
 
 ---
 
@@ -265,7 +284,9 @@ At the end of each run, the system shall produce a report with run ID, scoring m
 | Auditability | Escalations, approvals, edits and reviewer notes must be recorded per case. |
 | Security & Privacy | No credentials in source; prototype uses synthetic data only; customer contact data is visible only to authorized roles. |
 | Reliability | External model failure must fall back to rule-based scoring without stopping the run. |
-| Configurability | Threshold, top-N, scoring mode and model URL are configurable without changing the workflow. |
+| Configurability | Threshold, top-N, scoring mode, model URL, contact cooldown and approval SLA are configurable without changing the workflow. |
+| Policy compliance | No offer outside the retention policy reaches Follow-up Ready without a recorded supervisor exception. |
+| Idempotency | Repeated or overlapping runs do not create a second open case for the same customer. |
 | Interoperability | External models are integrated through a documented JSON contract. |
 | Performance | A run over 150 customers must complete its automated steps within minutes, excluding human approval time. |
 | Maintainability | Scoring, recommendation and escalation steps are separate and replaceable. |
@@ -277,17 +298,20 @@ At the end of each run, the system shall produce a report with run ID, scoring m
 ### 7.1 Main Workflow
 
 1. Run starts on schedule (daily) or on demand.
-2. UiPath reads customers and open tickets in parallel from Data Fabric.
+2. UiPath reads customers, open tickets and existing cases in parallel from Data Fabric.
 3. UiPath builds per-customer features.
 4. UiPath scores churn risk (rules, or external model with fallback).
-5. UiPath prioritizes customers by risk and revenue at risk.
-6. For each prioritized customer:
+5. UiPath prioritizes customers by risk and revenue at risk, skipping customers with an open case or within the contact cooldown.
+6. UiPath flags approvals waiting past the SLA.
+7. For each prioritized customer:
    1. Create a retention case.
    2. Escalate the most overdue ticket, if any.
    3. AI agent prepares the recommendation, offer and message.
-   4. Retention officer approves (with edits) or chooses no action.
-   5. Case is updated; approved follow-ups are prepared or sent.
-7. UiPath produces the run report.
+   4. The policy guardrail checks the AI draft; the result is shown to the reviewer.
+   5. Retention officer approves (with edits) or chooses no action.
+   6. The approved version is checked again; an out-of-policy offer goes to a supervisor (exception or reject).
+   7. Case is updated; approved follow-ups are prepared or sent.
+8. UiPath produces the run report.
 
 ### 7.2 Exception Handling
 
@@ -299,6 +323,9 @@ At the end of each run, the system shall produce a report with run ID, scoring m
 | Data source unavailable | Fail the run visibly; no partial customer contact |
 | Reviewer chooses no action | Close the case without contact |
 | Email connection unavailable | Keep case at Follow-up Ready; report that delivery is pending |
+| AI draft or reviewer edit outside the offer policy | Show the violations; require a supervisor exception or reject the offer |
+| Customer already has an open case or was recently contacted | Skip the customer and list the reason in the report |
+| Approval not given within the SLA | Flag the case (`ApprovalOverdue`) and list it in the report |
 
 ---
 
@@ -320,7 +347,7 @@ At the end of each run, the system shall produce a report with run ID, scoring m
 |---|---|
 | CsCustomer | CustomerCode, CustomerName, ServicePlan, MonthlyFee, TenureMonths, ContractMonthsLeft, City, ContactEmail, Outages30d, AvgPacketLoss, AvgLatencyMs, Complaints30d, LastComplaint |
 | CsTicket | TicketCode, CustomerCode, Category, Description, OpenedAt, SlaHours, TicketStatus, Escalated, EscalationNote |
-| CsRetentionCase | RunId, CustomerCode, CustomerName, ChurnScore, RiskLevel, TopReasons, RevenueAtRisk, ScoringMode, TicketEscalated, RecommendedAction, OfferDetail, FollowUpMessage, Decision, ReviewerNote, CaseStatus |
+| CsRetentionCase | RunId, CustomerCode, CustomerName, ChurnScore, RiskLevel, TopReasons, RevenueAtRisk, ScoringMode, TicketEscalated, RecommendedAction, OfferDetail, FollowUpMessage, Decision, ReviewerNote, CaseStatus, PolicyStatus, PolicyIssues, ApprovalOverdue |
 
 ### Configuration
 
@@ -330,6 +357,8 @@ At the end of each run, the system shall produce a report with run ID, scoring m
 | Top N customers per run | 5 |
 | Scoring mode | rules |
 | External model URL | empty |
+| Contact cooldown | 30 days |
+| Approval SLA | 24 hours |
 | Schedule | Daily |
 
 ---
@@ -343,6 +372,7 @@ The system shall:
 4. Allow the reviewer to choose no action.
 5. Record every decision, edit and note.
 6. Never claim a follow-up was sent without delivery confirmation.
+7. Keep the AI inside written policy: an out-of-policy offer, from the AI or from a person, needs a supervisor's recorded exception.
 
 AI and automation prepare the work; people make the retention decisions.
 
@@ -362,6 +392,8 @@ The MVP is successful when:
 8. A run report shows customers scored, high risk, revenue at risk, escalations and approvals.
 9. Scoring can switch to an external model through configuration, with fallback.
 10. At least one failure scenario is handled and visible.
+11. Out-of-policy offers cannot reach Follow-up Ready without a supervisor exception.
+12. Overlapping runs do not create duplicate cases.
 
 ---
 

@@ -245,6 +245,36 @@ The retention officer is the decision-maker for customer contact and offers.
 - Notifications are sent only when an email connection is configured.
 - Without a connection, the system shows that delivery is pending and does not claim it was sent.
 
+### UR-11: Keep Offers Within Policy
+
+**User Requirement:** As a retention manager, I want every offer checked against our retention policy, so that neither the AI nor an officer can give away more than allowed without a supervisor's decision.
+
+**Expected System Behavior:** The AI draft is checked and the result is shown in the approval task. The version the officer approves is checked again. An out-of-policy offer creates a supervisor task listing the violations.
+
+**Acceptance Criteria:**
+- An offer above 30%, longer than 3 months, combining offer types, or with an unjustified free month is flagged.
+- Promises such as "dijamin" or "bebas gangguan" are flagged.
+- An out-of-policy offer reaches Follow-up Ready only after the supervisor approves an exception, with the reason recorded.
+- A rejected offer closes the case as `Closed - Offer Rejected`.
+
+### UR-12: No Duplicate Cases or Repeated Contact
+
+**User Requirement:** As a retention officer, I do not want a second task for a customer I am already handling, and I do not want to contact the same customer again too soon.
+
+**Acceptance Criteria:**
+- A customer with an open case gets no new case, even when runs overlap.
+- A customer contacted within the cooldown (30 days) is skipped.
+- A customer whose offer was rejected by the supervisor can get a new, compliant offer in the next run.
+- The report lists every skipped customer with the reason.
+
+### UR-13: Approvals Do Not Wait Unnoticed
+
+**User Requirement:** As a retention manager, I want to see approvals that have waited too long.
+
+**Acceptance Criteria:**
+- Cases waiting longer than the approval SLA (24 hours) are flagged `ApprovalOverdue`.
+- Flagged cases appear in the next run report.
+
 ---
 
 ## 6. User Journey
@@ -261,7 +291,9 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **Step 6 — Recommendations prepared.** The AI agent drafts the action, offer and message.
 
-**Step 7 — Officer decides.** The retention officer edits and approves, or chooses no action.
+**Step 7 — Officer decides.** The retention officer sees the policy check, edits and approves, or chooses no action.
+
+**Step 7a — Supervisor (only when needed).** If the approved offer is out of policy, the supervisor approves an exception or rejects it.
 
 **Step 8 — Follow-up.** Approved follow-ups are prepared or sent.
 
@@ -283,6 +315,9 @@ The retention officer is the decision-maker for customer contact and offers.
 | US-08 | As a retention manager, I want a run report. | Must Have |
 | US-09 | As an administrator, I want to plug in our own churn model. | Should Have |
 | US-10 | As a user, I want email notifications. | Should Have |
+| US-11 | As a retention manager, I want offers kept within policy, with supervisor exceptions. | Must Have |
+| US-12 | As a retention officer, I want no duplicate cases and no repeated contact. | Must Have |
+| US-13 | As a retention manager, I want overdue approvals flagged. | Should Have |
 
 ---
 
@@ -290,11 +325,12 @@ The retention officer is the decision-maker for customer contact and offers.
 
 | Interface | Description |
 |---|---|
-| Approval task (Action Center) | Customer context, churn score, reasons, revenue at risk, ticket status, recommendation, editable offer and message, reviewer note, Approve / No Action |
+| Approval task (Action Center) | Customer context, churn score, reasons, revenue at risk, ticket status, recommendation, policy check result, editable offer and message, reviewer note, Approve / No Action |
+| Supervisor task (Action Center) | Customer, revenue at risk, approved offer, policy violations, reviewer note, supervisor reason, Approve Exception / Reject Offer |
 | Retention cases (Data Fabric) | List of cases per run with status, decision and notes |
 | Tickets (Data Fabric) | Open and escalated tickets with escalation notes |
 | Run report | Run output and, when email is configured, a summary email |
-| Configuration | Run inputs: threshold, top N, scoring mode, external model URL |
+| Configuration | Run inputs: threshold, top N, scoring mode, external model URL, contact cooldown, approval SLA |
 
 ### Usability Requirements
 
@@ -312,11 +348,12 @@ The retention officer is the decision-maker for customer contact and offers.
 3. Priority is risk × annual revenue at risk.
 4. Only overdue tickets are escalated, and only for prioritized customers.
 5. No customer is contacted without approval.
-6. Offers must stay within the policy stated to the AI agent.
+6. Offers must stay within policy; an out-of-policy offer needs a supervisor's recorded exception.
 7. Every decision is recorded with its reviewer note.
 8. A follow-up is reported as sent only after delivery succeeds.
 9. External model failure falls back to rules and is reported.
 10. The prototype uses synthetic data only.
+11. One open case per customer; no new contact within the cooldown.
 
 ---
 
@@ -334,6 +371,10 @@ The retention officer is the decision-maker for customer contact and offers.
 | UAT-08 | External mode with failing model URL | Fallback to rules recorded; run completes |
 | UAT-09 | Email connection not configured | Status stays Follow-up Ready; no false "sent" claim |
 | UAT-10 | Run report reviewed | Totals match recorded cases |
+| UAT-11 | Officer edits the offer to 50% for 6 months and approves | Supervisor task lists the violations; Approve Exception stores `Approved (Exception)` with both notes |
+| UAT-12 | Supervisor rejects an out-of-policy offer | Case `Closed - Offer Rejected`; customer eligible again in the next run |
+| UAT-13 | Second run while the first run's tasks are still open | Those customers skipped with reason; no duplicate case |
+| UAT-14 | Approval waits past the SLA | Case flagged `ApprovalOverdue` and listed in the report |
 
 ---
 

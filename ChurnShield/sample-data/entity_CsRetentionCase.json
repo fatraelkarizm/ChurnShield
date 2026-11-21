@@ -13,4 +13,7 @@
 {"name":"FollowUpMessage","type":"MULTILINE_TEXT","lengthLimit":4000},
 {"name":"Decision","type":"STRING"},
 {"name":"ReviewerNote","type":"MULTILINE_TEXT","lengthLimit":4000},
-{"name":"CaseStatus","type":"STRING"}]}
+{"name":"CaseStatus","type":"STRING"},
+{"name":"PolicyStatus","type":"STRING"},
+{"name":"PolicyIssues","type":"MULTILINE_TEXT","lengthLimit":4000},
+{"name":"ApprovalOverdue","type":"BOOLEAN"}]}
