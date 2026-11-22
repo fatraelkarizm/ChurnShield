@@ -260,6 +260,10 @@ Statuses: Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed -
 
 After approval, the system shall prepare the follow-up for delivery. When an email connection is configured, it shall send the follow-up and set the status to Follow-up Sent. Without it, the case stays at Follow-up Ready and nothing is claimed as sent.
 
+The system shall also email the NOC when a ticket is escalated (ticket, hours overdue, churn score, revenue at risk, reasons) and email the run report to the retention manager.
+
+Prototype: emails are sent through the Integration Service Gmail connector to one test inbox (`demoInbox`); the subject names the intended recipient. An email failure leaves the case at Follow-up Ready with the error recorded, and the run continues.
+
 ### FR-10: Run Report
 
 At the end of each run, the system shall produce a report with run ID, scoring mode, complaint analysis mode, customers scored, high-risk customers, total revenue at risk, tickets escalated, offers approved, revenue offered retention, policy exceptions, offers rejected by the supervisor, no-action decisions, cases needing manual review, early-warning customers, customers skipped (with reason), approvals past SLA, and the list of cases.
@@ -377,6 +381,7 @@ Each run shall flag cases that have waited for approval longer than the approval
 | External model URL | empty |
 | Contact cooldown | 30 days |
 | Approval SLA | 24 hours |
+| Demo inbox for all emails | empty (no email sent) |
 | Schedule | Daily |
 
 ---
@@ -414,6 +419,7 @@ The MVP is successful when:
 12. Overlapping runs do not create duplicate cases.
 13. Complaints are read by AI, with a keyword fallback, and early-warning customers are reported.
 14. An AI failure for one customer does not stop the run.
+15. Escalation, follow-up and report emails are delivered (to the demo inbox), and a delivery failure does not stop the run.
 
 ---
 

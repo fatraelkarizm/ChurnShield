@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "bindings": [
+    {
+      "id": "gmail",
+      "name": "gmail",
+      "resource": "Connection",
+      "resourceKey": "0e2e2927-fde7-4940-a117-827ec919d20e",
+      "default": "0e2e2927-fde7-4940-a117-827ec919d20e",
+      "propertyAttribute": "ConnectionId"
+    },
+    {
+      "id": "workspace",
+      "name": "workspace",
+      "resource": "Connection",
+      "resourceKey": "c23bf442-8c88-4136-89f2-2233d509c239",
+      "default": "c23bf442-8c88-4136-89f2-2233d509c239",
+      "propertyAttribute": "FolderKey"
+    }
+  ]
+}

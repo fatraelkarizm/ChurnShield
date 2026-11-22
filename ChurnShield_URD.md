@@ -249,6 +249,8 @@ The retention officer is the decision-maker for customer contact and offers.
 **Acceptance Criteria:**
 - Notifications are sent only when an email connection is configured.
 - Without a connection, the system shows that delivery is pending and does not claim it was sent.
+- The NOC email explains why the ticket was escalated (risk, revenue, hours overdue); the customer email carries the approved offer; the manager email carries the run report.
+- A failed email keeps the case at Follow-up Ready with the error noted.
 
 ### UR-11: Keep Offers Within Policy
 
@@ -385,6 +387,8 @@ The retention officer is the decision-maker for customer contact and offers.
 | UAT-16 | Low-score customer asks how to cancel | Listed as early warning in the report |
 | UAT-17 | Officer switches to a discount but keeps a message promising a free month | Re-check flags the message; supervisor task |
 | UAT-18 | AI model unavailable | Keyword fallback noted; case `Needs Manual Review`; run completes |
+| UAT-19 | Run with the demo inbox set; offer approved | NOC, customer and manager emails received; case `Follow-up Sent` |
+| UAT-20 | Email connection fails | Case stays `Follow-up Ready` with the error; run completes |
 
 ---
 

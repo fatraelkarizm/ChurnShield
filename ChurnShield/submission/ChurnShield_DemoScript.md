@@ -1,24 +1,28 @@
 # ChurnShield — Skrip Video Demo (target 4 menit, maks. 100 MB MP4)
 
+**Tokoh cerita:** Ibu Ayu Nugroho (CUST-0038, data sintetis). Keluhan terakhirnya: *"Udah seminggu lemot parah tiap malam, mending cabut aja kalau gini terus."* Paket BizNet Office 100 Mbps, revenue Rp 11,4 juta/tahun. Setelah reset data, Ibu Ayu selalu masuk lima besar.
+
 **Persiapan sebelum rekam**
 1. `bash sample-data/reset-demo-data.sh` (tiket kembali Open, kasus lama dihapus).
-2. Buka VS Code: `ChurnShield/ChurnShield.flow` di canvas Maestro.
-3. Buka tab browser: Action Center (Tasks) dan Data Fabric (entity `CsRetentionCase`, `CsTicket`, `CsCustomer`).
-4. Rekam layar 1080p, mikrofon untuk voiceover.
+2. Kosongkan inbox demo (Gmail test), lalu buka di tab browser.
+3. Tab lain: Action Center (Tasks), Data Fabric (`CsCustomer`, `CsTicket`, `CsRetentionCase`).
+4. VS Code: buka canvas `ChurnShield.flow` hanya untuk dilihat; **jangan disimpan** (canvas yang disimpan menghapus binding Gmail).
+5. Input run: default + `demoInbox` = alamat inbox demo.
+6. Rekam 1080p dengan voiceover. **Potong** bagian menunggu: run berjalan sekitar 1 menit sampai task muncul, dan email masuk beberapa detik setelah approve.
 
 | Waktu | Layar | Narasi (voiceover) |
 |---|---|---|
-| 0:00–0:20 | Slide judul | "Ini ChurnShield. ISP sering terlambat tahu pelanggan mana yang akan berhenti, karena data jaringan, tiket, dan langganan terpisah." |
-| 0:20–0:40 | Canvas flow | "Alurnya dijalankan UiPath Maestro: baca data paralel, AI membaca keluhan, skor risiko, prioritas berdasarkan revenue, eskalasi tiket, rekomendasi AI, cek kebijakan, lalu approval manusia." |
-| 0:40–0:55 | Data Fabric `CsCustomer`, kolom `LastComplaint` | "Data sintetis: 150 pelanggan, 52 tiket terbuka. Keluhannya ditulis apa adanya, misalnya 'mending cabut aja kalau gini terus'. Daftar kata kunci tidak menangkap kalimat seperti ini, AI menangkapnya." |
-| 0:55–1:10 | Klik Run/Debug di VS Code (input default) | "Saya jalankan dengan pengaturan default: skor minimal 0,6, lima pelanggan teratas." |
-| 1:10–1:25 | Data Fabric `CsTicket` di-refresh | "Tiket pelanggan prioritas yang lewat SLA sudah berstatus Escalated, lengkap dengan catatan skor risiko dan revenue." |
-| 1:25–2:05 | Action Center: buka satu task | "Setiap pelanggan punya satu task: skor, alasan (termasuk hasil baca keluhan oleh AI), revenue at risk, draf penawaran AI, dan hasil cek kebijakannya. Penawaran bukan teks bebas: jenisnya dipilih dari dropdown, persen dan bulannya angka. Saya ubah jadi Diskon 20% selama 3 bulan, sesuaikan pesannya, lalu Approve." Task lain: satu Approve apa adanya, satu No Action. |
-| 2:05–2:45 | Task berikutnya: set Diskon 50%, 6 bulan, Approve → task supervisor muncul | "Kalau reviewer memberi penawaran di luar kebijakan, ChurnShield tidak langsung meloloskannya. Versi yang disetujui dicek ulang, termasuk isi pesannya, jadi pesan yang menjanjikan lebih dari penawaran juga tertangkap. Muncul task supervisor dengan daftar pelanggarannya; supervisor memutuskan: beri pengecualian dengan alasan, atau tolak." Pilih Approve Exception (atau Reject Offer). |
-| 2:45–3:20 | Output run (`summary`, `report.earlyWarningIntent`) + `CsRetentionCase` | "Laporan run: pelanggan dinilai, berisiko, revenue at risk, tiket dieskalasi, penawaran disetujui, dan revenue yang ditawari retensi. Kami sengaja tidak menyebutnya revenue terselamatkan, karena hasil akhirnya belum dilacak. Ada juga peringatan dini: pelanggan yang skornya masih rendah tapi sudah bertanya cara berhenti langganan." |
-| 3:20–3:45 | Jalankan lagi dengan `topN = 3` | "Kalau dijalankan lagi, pelanggan yang sudah punya kasus atau baru dihubungi tidak diproses ulang, jadi tidak ada task ganda. Kalau AI gagal untuk satu pelanggan, kasusnya masuk review manual dan pelanggan lain tetap jalan." |
-| 3:45–4:00 | Slide penutup | "AI membaca dan menyiapkan, aturan membatasi, manusia memutuskan." |
+| 0:00–0:25 | Data Fabric `CsCustomer`, baris Ibu Ayu, kolom keluhan disorot | "Ibu Ayu sudah seminggu internetnya lemot tiap malam. Keluhan terakhirnya: 'mending cabut aja kalau gini terus.' Tiket gangguannya lewat SLA. Datanya ada, tapi tersebar di tiga sistem: jaringan, tiket, dan billing. Tidak ada yang menghubungkannya, dan bulan depan Rp 11,4 juta per tahun bisa pergi. Untuk ISP seperti HiFi, ini terjadi setiap hari." |
+| 0:25–0:40 | Canvas flow (zoom out) | "Ini ChurnShield, satu alur di UiPath Maestro: baca data, AI membaca keluhan, skor risiko, eskalasi ke NOC, rekomendasi AI, cek kebijakan, keputusan manusia, lalu email." |
+| 0:40–0:55 | Klik Run di VS Code (potong saat menunggu) | "Alur ini punya jadwal harian jam 07.00 yang aktif setelah deploy. Untuk demo saya jalankan manual sekarang." |
+| 0:55–1:15 | Inbox: email "[untuk NOC] Eskalasi TKT-…" | "Tiket Ibu Ayu langsung dieskalasi, dan NOC menerima email: skor risiko, revenue, berapa jam lewat SLA, dan alasannya. NOC tahu kenapa tiket ini harus didahulukan." |
+| 1:15–1:45 | Action Center: task Ibu Ayu, sorot alasan "AI: keluhan menunjukkan niat berhenti" | "Tim retensi menerima satu task per pelanggan. AI membaca keluhan Ibu Ayu dan menangkap niat berhentinya, padahal kalimat seperti ini lolos dari daftar kata kunci. Ada draf penawaran AI, dan hasil cek kebijakannya." |
+| 1:45–2:35 | Reviewer set Diskon 50%, 6 bulan, Approve → task supervisor | "Reviewer ingin memberi lebih: diskon 50% selama 6 bulan. ChurnShield tidak langsung meloloskannya. Penawaran dan isi pesannya dicek ulang, lalu supervisor menerima task dengan daftar pelanggarannya. Supervisor memutuskan dan menulis alasannya." Pilih Approve Exception. |
+| 2:35–2:55 | Inbox: email "[untuk pelanggan …] Tindak lanjut layanan internet Anda" | "Begitu disetujui, email follow-up terkirim ke pelanggan: permintaan maaf, tindak lanjut teknis, dan penawaran yang disetujui. Tidak ada pelanggan dihubungi tanpa keputusan manusia." |
+| 2:55–3:35 | Selesaikan task lain (approve / No Action), lalu inbox: email "[untuk manajer retensi] Laporan harian" | "Manajer menerima laporan harian: 150 pelanggan dinilai, 21 berisiko tinggi, Rp 150 juta revenue at risk, tiket yang dieskalasi, dan revenue yang ditawari retensi. Ada juga peringatan dini: pelanggan yang skornya masih rendah tapi sudah bertanya cara berhenti langganan." |
+| 3:35–3:50 | Data Fabric `CsRetentionCase` | "Semua keputusan, catatan reviewer dan supervisor, serta status pengiriman tersimpan sebagai jejak audit." |
+| 3:50–4:00 | Slide penutup | "AI membaca dan menyiapkan, aturan membatasi, manusia memutuskan." |
 
-**Opsional (kalau waktu cukup):** run dengan `scoringMode=external` + URL salah untuk menunjukkan fallback ke skor rules.
+**Kalau ditanya juri (jangan dimasukkan ke video):** pelanggan yang sudah punya kasus tidak diproses ulang; kalau AI atau email gagal, kasusnya ditandai dan run tetap jalan; model ML milik ISP bisa disambungkan lewat slot external.
 
-**Catatan kejujuran untuk narasi:** sebut bahwa data dan kalimat keluhannya sintetis (kami tulis sendiri), bobot skor ditentukan dari penilaian domain dan belum dikalibrasi ke data churn asli, model ML belum disambungkan (slot + fallback), email follow-up belum dikirim (status berhenti di Follow-up Ready), dan task yang lewat SLA ditandai, bukan dibatalkan otomatis.
+**Catatan kejujuran untuk narasi:** sebut bahwa data dan kalimat keluhannya sintetis (kami tulis sendiri), semua email demo dikirim ke satu inbox uji (subjeknya menyebut penerima sebenarnya), bobot skor belum dikalibrasi ke data churn asli, dan model ML belum disambungkan (slot + fallback).

@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "resources": [
+    {
+      "resource": "connection",
+      "key": "0e2e2927-fde7-4940-a117-827ec919d20e",
+      "id": "connection0e2e2927-fde7-4940-a117-827ec919d20e",
+      "value": {
+        "ConnectionId": {
+          "defaultValue": "0e2e2927-fde7-4940-a117-827ec919d20e",
+          "isExpression": false,
+          "displayName": "uipath-google-gmail connection"
+        }
+      },
+      "metadata": {
+        "ActivityName": "sendNocEmail",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "uipath-google-gmail connection",
+        "UseConnectionService": "true",
+        "Connector": "uipath-google-gmail"
+      }
+    }
+  ]
+}

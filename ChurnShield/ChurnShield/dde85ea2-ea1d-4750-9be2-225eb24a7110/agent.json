@@ -3,59 +3,31 @@
   "settings": {
     "model": "anthropic.claude-sonnet-5",
     "maxTokens": 16384,
-    "temperature": 1,
+    "temperature": 0,
     "engine": "basic-v2",
-    "maxIterations": 25,
     "mode": "standard"
   },
+  "projectId": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
+  "id": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
+  "name": "recommend",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "agentContext__output__name": {
-        "type": "string"
-      },
-      "agentContext__output__plan": {
-        "type": "string"
-      },
-      "agentContext__output__fee": {
-        "type": "string"
-      },
-      "agentContext__output__city": {
-        "type": "string"
-      },
-      "agentContext__output__tenure": {
-        "type": "string"
-      },
-      "agentContext__output__contractLeft": {
-        "type": "string"
-      },
-      "agentContext__output__outages": {
-        "type": "string"
-      },
-      "agentContext__output__packetLoss": {
-        "type": "string"
-      },
-      "agentContext__output__latency": {
-        "type": "string"
-      },
-      "agentContext__output__complaints": {
-        "type": "string"
-      },
-      "agentContext__output__lastComplaint": {
-        "type": "string"
-      },
-      "agentContext__output__ticket": {
-        "type": "string"
-      },
-      "agentContext__output__score": {
-        "type": "string"
-      },
-      "agentContext__output__level": {
-        "type": "string"
-      },
-      "agentContext__output__reasons": {
-        "type": "string"
-      }
+      "agentContext__output__name": {},
+      "agentContext__output__plan": {},
+      "agentContext__output__fee": {},
+      "agentContext__output__city": {},
+      "agentContext__output__tenure": {},
+      "agentContext__output__contractLeft": {},
+      "agentContext__output__outages": {},
+      "agentContext__output__packetLoss": {},
+      "agentContext__output__latency": {},
+      "agentContext__output__complaints": {},
+      "agentContext__output__lastComplaint": {},
+      "agentContext__output__ticket": {},
+      "agentContext__output__score": {},
+      "agentContext__output__level": {},
+      "agentContext__output__reasons": {}
     }
   },
   "outputSchema": {
@@ -82,7 +54,16 @@
       "followUpMessage": {
         "type": "string"
       }
-    }
+    },
+    "required": [
+      "riskSummary",
+      "recommendedAction",
+      "offerType",
+      "discountPercent",
+      "durationMonths",
+      "technicianVisit",
+      "followUpMessage"
+    ]
   },
   "metadata": {
     "storageVersion": "50.0.0",
@@ -228,8 +209,5 @@
         }
       ]
     }
-  ],
-  "projectId": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
-  "id": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
-  "name": "recommend"
+  ]
 }

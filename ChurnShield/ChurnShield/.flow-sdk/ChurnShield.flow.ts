@@ -18,13 +18,46 @@
  * Data is synthetic. No customer is contacted without approval.
  */
 import {
-  flow, scheduled, script, inlineAgent, hitl, http,
+  flow, scheduled, script, inlineAgent, hitl, http, connector,
   dataFabricRead, dataFabricCreate, dataFabricUpdate,
   out, v, lit, js, err, types,
 } from "@uipath/maestro-builder-sdk";
+import { SendEmail } from "./connectors-local/uipath-google-gmail.ts";
 
 const MODEL = "anthropic.claude-sonnet-5";
 const item = (field: string) => v(`eachCustomer.currentItem.${field}`);
+
+// FR-09 email delivery through the Integration Service Gmail connector.
+// Demo mode: every email goes to the `demoInbox` run input, and the subject names the intended
+// recipient (NOC, the customer's synthetic address, the manager). Empty `demoInbox` = no email is sent.
+const GMAIL = { connection: "gmail", folder: "workspace" };
+const sendMail = (subject: ReturnType<typeof js>, body: ReturnType<typeof js>) =>
+  connector(SendEmail, { To: v("cfgDemoInbox"), Subject: subject, Body: body, SaveAsDraft: false }, GMAIL);
+const emailOn = js`$vars.cfgDemoInbox !== ""`;
+
+// customer follow-up after an approval (normal or supervisor exception); `sfx` keeps step names unique
+const followUpEmail = (b: any, sfx: string) =>
+  b.branch(`emailCustomer${sfx}`, emailOn, (e: any) =>
+    e
+      .step(`sendFollowUp${sfx}`, sendMail(
+        js`"[Demo ChurnShield | untuk pelanggan " + $vars.eachCustomer.currentItem.contactEmail + "] Tindak lanjut layanan internet Anda"`,
+        js`"<p>" + String($vars.retentionReview.output.followUpMessage).split("\\n").join("<br>") + "</p>" +
+          "<p><b>Penawaran:</b> " + $vars.recheckPolicy.output.offer + "</p>" +
+          "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). Penawaran disetujui oleh tim retensi.</p>"`,
+      ))
+      .onError((h: any) =>
+        h.step(`followUpFailed${sfx}`, dataFabricUpdate({
+          entity: "CsRetentionCase",
+          record: { byId: out("openCase", "Id") },
+          set: { ReviewerNote: js`"Email follow-up gagal terkirim: " + (${err(`sendFollowUp${sfx}`, "message")} || "-") + ". Status tetap Follow-up Ready."` },
+        })).continue(),
+      )
+      .step(`markSent${sfx}`, dataFabricUpdate({
+        entity: "CsRetentionCase",
+        record: { byId: out("openCase", "Id") },
+        set: { CaseStatus: "Follow-up Sent" },
+      })),
+  );
 
 const OFFER_OPTIONS = [
   { id: "offer-discount", value: "Diskon", label: "Diskon" },
@@ -97,6 +130,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .var("cfgModelUrl", types.string, "")
   .var("cfgCooldownDays", types.number, 30)
   .var("cfgSlaHours", types.number, 24)
+  .var("cfgDemoInbox", types.string, "")
   .input({
     riskThreshold: { type: types.number, default: 0.6, shared: "cfgThreshold" },
     topN: { type: types.number, default: 5, shared: "cfgTopN" },
@@ -104,6 +138,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     externalModelUrl: { type: types.string, default: "", shared: "cfgModelUrl" },
     contactCooldownDays: { type: types.number, default: 30, shared: "cfgCooldownDays" },
     approvalSlaHours: { type: types.number, default: 24, shared: "cfgSlaHours" },
+    demoInbox: { type: types.string, default: "", shared: "cfgDemoInbox" }, // empty = no email sent
   })
   .entryPoint("dailyRun", scheduled({ every: "0 0 7 * * ?" }))
   .output({
@@ -399,7 +434,29 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                 "), revenue at risk Rp " + $vars.eachCustomer.currentItem.revenueAtRisk + "/tahun, lewat SLA " +
                 $vars.eachCustomer.currentItem.hoursOverdue + " jam. Prioritaskan penanganan."`,
             },
-          })),
+          }))
+          // NOC is told why this ticket jumps the queue
+          .branch("emailNoc", emailOn, (e) =>
+            e
+              .step("sendNocEmail", sendMail(
+                js`"[Demo ChurnShield | untuk NOC] Eskalasi " + $vars.eachCustomer.currentItem.overdueTicketCode + " - pelanggan risiko churn " + $vars.eachCustomer.currentItem.riskLevel`,
+                js`"<p>Tiket <b>" + $vars.eachCustomer.currentItem.overdueTicketCode + "</b> (" + $vars.eachCustomer.currentItem.overdueTicketCategory +
+                  ") sudah lewat SLA <b>" + $vars.eachCustomer.currentItem.hoursOverdue + " jam</b> dan dieskalasi otomatis.</p>" +
+                  "<p>Pelanggan: " + $vars.eachCustomer.currentItem.customerCode + " " + $vars.eachCustomer.currentItem.customerName +
+                  " (" + $vars.eachCustomer.currentItem.servicePlan + ", " + $vars.eachCustomer.currentItem.city + ")<br>" +
+                  "Skor risiko churn: <b>" + $vars.eachCustomer.currentItem.churnScore + "</b> (" + $vars.eachCustomer.currentItem.riskLevel + ")<br>" +
+                  "Revenue at risk: <b>Rp " + String($vars.eachCustomer.currentItem.revenueAtRisk).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".") + "/tahun</b></p>" +
+                  "<p>Alasan: " + $vars.eachCustomer.currentItem.reasons + "</p>" +
+                  "<p>Mohon prioritaskan penanganan. Tim retensi sedang menyiapkan tindak lanjut ke pelanggan.</p>" +
+                  "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis), run " + $vars.newRun.output + ".</p>"`,
+              ))
+              .onError((h) =>
+                h.step("nocEmailFailed", script({
+                  code: `return "NOC email failed";`,
+                  returns: "string",
+                })).stepToRef("agentContext"),
+              ),
+          ),
       )
 
       // FR-06 AI retention recommendation (inputs prepared as plain references for the agent)
@@ -546,7 +603,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                 "offerWithinPolicy",
                 js`$vars.recheckPolicy.output.status === "Compliant"`,
                 (ok) =>
-                  ok.step("approveCase", dataFabricUpdate({
+                  followUpEmail(ok.step("approveCase", dataFabricUpdate({
                     entity: "CsRetentionCase",
                     record: { byId: out("openCase", "Id") },
                     set: {
@@ -562,7 +619,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                       PolicyStatus: "Compliant",
                       PolicyIssues: "sesuai kebijakan",
                     },
-                  })),
+                  })), ""),
                 // out of policy: a supervisor must explicitly grant an exception
                 (exc) =>
                   exc.stepSwitch("supervisorReview", hitl({
@@ -583,7 +640,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                     {
                       value: "Approve Exception",
                       body: (s) =>
-                        s.step("approveException", dataFabricUpdate({
+                        followUpEmail(s.step("approveException", dataFabricUpdate({
                           entity: "CsRetentionCase",
                           record: { byId: out("openCase", "Id") },
                           set: {
@@ -599,7 +656,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                             PolicyStatus: "Exception Approved",
                             PolicyIssues: out("recheckPolicy", "issues"),
                           },
-                        })),
+                        })), "Ex"),
                     },
                     {
                       value: "Reject Offer",
@@ -656,6 +713,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const rejected = cases.filter((c) => c.Decision === "Rejected by Supervisor");
       const noAction = cases.filter((c) => c.Decision === "No Action");
       const aiFailed = cases.filter((c) => c.Decision === "AI Failed");
+      const sent = cases.filter((c) => c.CaseStatus === "Follow-up Sent");
       const escalated = cases.filter((c) => c.TicketEscalated === true);
       const aiFlagged = cases.filter((c) => c.PolicyStatus !== "Compliant" && c.Decision !== "No Action" && c.Decision !== "AI Failed");
       // revenue of customers who will receive an approved offer; whether they stay is not tracked yet
@@ -669,13 +727,36 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         (exceptions.length ? ", " + exceptions.length + " lewat pengecualian supervisor" : "") + "), " +
         (rejected.length ? rejected.length + " ditolak supervisor, " : "") +
         (aiFailed.length ? aiFailed.length + " perlu ditangani manual karena AI gagal, " : "") + noAction.length + " tanpa tindakan." +
+        ($vars.cfgDemoInbox !== "" ? " " + sent.length + " email follow-up terkirim (mode demo)." : " Email belum dikirim (demoInbox kosong).") +
         (p.hiddenIntent.length ? " Peringatan dini: " + p.hiddenIntent.length + " pelanggan berskor rendah menyebut niat berhenti di keluhannya." : "") +
         (p.skipped.length ? " " + p.skipped.length + " pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak." : "") +
         (p.overdue.length ? " " + p.overdue.length + " approval lewat SLA " + $vars.cfgSlaHours + " jam ditandai untuk supervisor." : "") +
         ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "") +
         ($vars.complaintMode !== "ai" && $vars.complaintNote ? " Catatan: " + $vars.complaintNote + "." : "");
+      const esc = (s) => String(s == null ? "-" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const td = "style='border:1px solid #ccc;padding:6px;vertical-align:top'";
+      const kpi = (label, value, color) => "<td style='padding:10px 16px;background:#EEF3F4;border-radius:6px'>" +
+        "<div style='font-size:22px;font-weight:bold;color:" + color + "'>" + value + "</div><div style='color:#3C5560'>" + label + "</div></td>";
+      const reportHtml =
+        "<h2 style='color:#0E2A33'>Laporan harian ChurnShield</h2><p>" + esc(summary) + "</p>" +
+        "<table cellspacing='8'><tr>" +
+          kpi("pelanggan dinilai", p.scoredCount, "#0E2A33") + kpi("berisiko tinggi", p.highRiskCount, "#D64545") +
+          kpi("revenue at risk/tahun", rp(p.highRiskRevenue), "#D64545") + kpi("tiket dieskalasi", escalated.length, "#F28C28") +
+          kpi("ditawari retensi/tahun", rp(offeredRevenue), "#3E9E6A") +
+        "</tr></table>" +
+        "<h3>Kasus run ini</h3><table style='border-collapse:collapse'><tr>" +
+          ["Pelanggan", "Skor", "Keputusan", "Status", "Penawaran", "Kebijakan"].map((h) => "<th " + td + ">" + h + "</th>").join("") + "</tr>" +
+          cases.map((c) => "<tr><td " + td + ">" + esc(c.CustomerCode + " " + c.CustomerName) + "</td><td " + td + ">" + esc(c.ChurnScore) +
+            "</td><td " + td + ">" + esc(c.Decision) + "</td><td " + td + ">" + esc(c.CaseStatus) + "</td><td " + td + ">" + esc(c.OfferDetail) +
+            "</td><td " + td + ">" + esc(c.PolicyStatus) + "</td></tr>").join("") + "</table>" +
+        (p.hiddenIntent.length ? "<h3>Peringatan dini: skor masih rendah, keluhan menyebut niat berhenti</h3><ul>" +
+          p.hiddenIntent.map((x) => "<li>" + esc(x.customer) + " (skor " + x.churnScore + "): \\"" + esc(x.complaint) + "\\"</li>").join("") + "</ul>" : "") +
+        (p.overdue.length ? "<h3>Approval lewat SLA</h3><ul>" + p.overdue.map((x) => "<li>" + esc(x.customerCode + " " + x.customerName) +
+          ", menunggu " + x.hoursWaiting + " jam</li>").join("") + "</ul>" : "") +
+        "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). \\"Ditawari retensi\\" = revenue pelanggan dengan penawaran disetujui; pelanggan bertahan atau tidak belum dilacak.</p>";
       return {
         summary: summary,
+        reportHtml: reportHtml,
         report: {
           runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,
           complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,
@@ -684,6 +765,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           casesProcessed: cases.length, ticketsEscalated: escalated.length,
           offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
           noAction: noAction.length, aiFailedManualReview: aiFailed.length,
+          followUpsSent: sent.length, emailMode: $vars.cfgDemoInbox !== "" ? "demo inbox" : "off",
           revenueOfferedRetention: offeredRevenue,
           revenueNote: "revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak",
           policyNotCompliantAtClose: aiFlagged.length,
@@ -696,8 +778,21 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         }
       };
     `,
-    returns: { summary: "string", report: "object" },
+    returns: { summary: "string", reportHtml: "string", report: "object" },
   }))
+  // daily report to the retention manager
+  .branch("emailManager", emailOn, (e) =>
+    e
+      .step("sendReportEmail", sendMail(
+        js`"[Demo ChurnShield | untuk manajer retensi] Laporan harian " + $vars.newRun.output`,
+        js`$vars.buildReport.output.reportHtml`,
+      ))
+      .onError((h) =>
+        h.step("reportEmailFailed", script({ code: `return "report email failed";`, returns: "string" }))
+          .stepToRef("finish"),
+      ),
+  )
+  .step("finish", script({ code: `return "done";`, returns: "string" }))
   .return({
     runId: out("newRun"),
     scoringModeUsed: v("scoringUsed"),

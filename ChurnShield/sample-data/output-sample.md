@@ -29,6 +29,16 @@
 
 The complaint texts were written by us for the demo, so this illustrates the behaviour; it is not a measured accuracy.
 
+**Run J** `RUN-20261122-042904`, `topN = 2`, `demoInbox` = a test Gmail inbox:
+
+> ... 2 kasus baru diproses: 2 tiket dieskalasi, 2 penawaran disetujui (Rp 22.800.000/tahun ditawari retensi, 1 lewat pengecualian supervisor), 0 tanpa tindakan. 2 email follow-up terkirim (mode demo). ...
+
+Emails received in the test inbox: 2 × "[Demo ChurnShield | untuk NOC] Eskalasi TKT-… - pelanggan risiko churn Very High",
+2 × "[Demo ChurnShield | untuk pelanggan pelangganNNN@example.com] Tindak lanjut layanan internet Anda" (one approved
+normally, one through a supervisor exception), 1 × "[Demo ChurnShield | untuk manajer retensi] Laporan harian RUN-20261122-042904".
+Both cases ended `Follow-up Sent`. In earlier runs H and I the Gmail binding was missing at run time: every email step
+failed with a 400, the cases stayed `Follow-up Ready` with the error in the note, and both runs completed.
+
 **Run E** `RUN-20261122-025204`, `topN = 3`, reviewer and supervisor decisions:
 
 | Customer | Reviewer action | Policy re-check | Supervisor | Stored decision / status |

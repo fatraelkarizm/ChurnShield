@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "entries": [
+    {
+      "nodeType": "uipath.connector.uipath-google-gmail.send-email",
+      "version": "1.0.0",
+      "connectorKey": "uipath-google-gmail",
+      "label": "Send Email",
+      "activityType": "Curated",
+      "objectName": "SendEmail",
+      "operationName": "Create",
+      "path": "descriptors/uipath-google-gmail/send-email@1.0.0.json"
+    }
+  ]
+}
