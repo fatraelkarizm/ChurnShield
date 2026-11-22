@@ -1,0 +1,151 @@
+CustomerCode,CustomerName,ServicePlan,MonthlyFee,TenureMonths,ContractMonthsLeft,City,ContactEmail,Outages30d,AvgPacketLoss,AvgLatencyMs,Complaints30d,LastComplaint
+CUST-0001,Dimas Siregar,HomeNet 30 Mbps,250000,55,20,Medan,pelanggan001@example.com,1,1.01,18,0,
+CUST-0002,Ayu Saputra,HomeNet 300 Mbps,750000,38,4,Semarang,pelanggan002@example.com,1,0.72,12,0,
+CUST-0003,Fajar Nugroho,HomeNet 50 Mbps,330000,67,24,Bekasi,pelanggan003@example.com,0,1.47,34,1,"Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"
+CUST-0004,Lestari Santoso,HomeNet 100 Mbps,450000,49,1,Surabaya,pelanggan004@example.com,0,1.33,57,0,
+CUST-0005,Rizky Permata,HomeNet 30 Mbps,250000,63,14,Jakarta,pelanggan005@example.com,1,1.33,37,0,
+CUST-0006,Putri Wijaya,HomeNet 50 Mbps,330000,56,23,Semarang,pelanggan006@example.com,2,0.83,54,0,
+CUST-0007,Zahra Hidayat,HomeNet 30 Mbps,250000,53,18,Medan,pelanggan007@example.com,1,1.04,57,0,
+CUST-0008,Eko Halim,BizNet Office 100 Mbps,950000,6,1,Makassar,pelanggan008@example.com,1,0.71,30,0,
+CUST-0009,Dimas Kusuma,BizNet Office 100 Mbps,950000,67,15,Medan,pelanggan009@example.com,0,1.39,28,1,
+CUST-0010,Oki Anggraini,HomeNet 30 Mbps,250000,67,23,Depok,pelanggan010@example.com,0,0.74,18,1,"Mau tanya, kalau berhenti langganan sebelum kontrak habis kena denda berapa?"
+CUST-0011,Fajar Setiawan,HomeNet 300 Mbps,750000,26,4,Surabaya,pelanggan011@example.com,2,0.47,43,0,
+CUST-0012,Wulan Pratama,HomeNet 30 Mbps,250000,19,1,Medan,pelanggan012@example.com,6,5.69,101,6,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0013,Zahra Wijaya,HomeNet 50 Mbps,330000,55,3,Depok,pelanggan013@example.com,1,0.92,50,0,
+CUST-0014,Dewi Kusuma,BizNet Office 100 Mbps,950000,3,13,Bekasi,pelanggan014@example.com,1,0.65,21,0,
+CUST-0015,Oki Siregar,HomeNet 30 Mbps,250000,65,4,Makassar,pelanggan015@example.com,0,1.06,40,0,
+CUST-0016,Sari Kusuma,HomeNet 50 Mbps,330000,31,20,Jakarta,pelanggan016@example.com,0,0.71,33,1,Tanya cara ganti password WiFi
+CUST-0017,Eko Halim,HomeNet 50 Mbps,330000,34,1,Medan,pelanggan017@example.com,7,7.62,92,5,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0018,Fitri Hidayat,HomeNet 50 Mbps,330000,25,10,Semarang,pelanggan018@example.com,1,0.85,17,1,"Tagihan sudah sesuai, hanya konfirmasi"
+CUST-0019,Ayu Saputra,HomeNet 300 Mbps,750000,69,4,Tangerang,pelanggan019@example.com,0,0.56,42,1,"Mau tanya, kalau berhenti langganan sebelum kontrak habis kena denda berapa?"
+CUST-0020,Reza Wijaya,HomeNet 30 Mbps,250000,47,1,Bandung,pelanggan020@example.com,2,0.56,46,0,
+CUST-0021,Teguh Hidayat,BizNet Office 100 Mbps,950000,29,18,Makassar,pelanggan021@example.com,0,0.25,57,0,
+CUST-0022,Fajar Ramadhan,BizNet Office 100 Mbps,950000,7,0,Depok,pelanggan022@example.com,9,3.95,191,3,"Sudah tiga kali janji teknisi, tidak ada yang datang. Kalau bulan depan masih begini saya stop langganan"
+CUST-0023,Budi Saputra,HomeNet 100 Mbps,450000,3,14,Tangerang,pelanggan023@example.com,0,0.19,38,0,
+CUST-0024,Wulan Lestari,HomeNet 100 Mbps,450000,42,13,Makassar,pelanggan024@example.com,1,0.98,57,0,
+CUST-0025,Fajar Utami,HomeNet 30 Mbps,250000,47,10,Surabaya,pelanggan025@example.com,1,1.05,28,1,Tanya cara ganti password WiFi
+CUST-0026,Teguh Anggraini,HomeNet 100 Mbps,450000,42,14,Jakarta,pelanggan026@example.com,0,1.12,19,0,
+CUST-0027,Dewi Pratama,HomeNet 100 Mbps,450000,17,20,Depok,pelanggan027@example.com,0,1.11,19,0,
+CUST-0028,Maya Kusuma,BizNet Office 100 Mbps,950000,55,12,Tangerang,pelanggan028@example.com,2,0.52,39,0,
+CUST-0029,Andi Pratama,HomeNet 50 Mbps,330000,20,9,Bogor,pelanggan029@example.com,0,0.86,54,1,Minta info upgrade paket
+CUST-0030,Budi Halim,HomeNet 300 Mbps,750000,72,6,Medan,pelanggan030@example.com,0,0.29,52,0,
+CUST-0031,Putri Pratama,HomeNet 100 Mbps,450000,33,21,Tangerang,pelanggan031@example.com,2,0.54,54,0,
+CUST-0032,Kartika Setiawan,HomeNet 50 Mbps,330000,37,18,Tangerang,pelanggan032@example.com,1,1.09,35,0,
+CUST-0033,Yoga Kusuma,HomeNet 300 Mbps,750000,22,7,Depok,pelanggan033@example.com,1,1.24,55,0,
+CUST-0034,Lestari Permata,HomeNet 30 Mbps,250000,40,3,Bogor,pelanggan034@example.com,1,1.08,14,0,
+CUST-0035,Maya Kusuma,HomeNet 30 Mbps,250000,7,19,Medan,pelanggan035@example.com,0,0.85,56,0,
+CUST-0036,Fajar Kusuma,BizNet Office 100 Mbps,950000,20,3,Bandung,pelanggan036@example.com,2,0.32,44,0,
+CUST-0037,Joko Nugroho,HomeNet 100 Mbps,450000,22,2,Depok,pelanggan037@example.com,7,6.14,128,3,"Latency tinggi saat jam sibuk, game dan video call lag"
+CUST-0038,Ayu Nugroho,BizNet Office 100 Mbps,950000,36,0,Bekasi,pelanggan038@example.com,5,5.47,121,2,"Udah seminggu lemot parah tiap malam, mending cabut aja kalau gini terus"
+CUST-0039,Lestari Santoso,HomeNet 300 Mbps,750000,23,6,Semarang,pelanggan039@example.com,9,6.5,177,4,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0040,Fitri Nugroho,BizNet Office 100 Mbps,950000,35,10,Surabaya,pelanggan040@example.com,0,1.19,17,1,"Terima kasih teknisi kemarin cepat tanggap, mau tanya info upgrade paket"
+CUST-0041,Dimas Santoso,HomeNet 100 Mbps,450000,24,11,Tangerang,pelanggan041@example.com,2,1.02,43,1,Minta info upgrade paket
+CUST-0042,Fajar Siregar,HomeNet 100 Mbps,450000,21,7,Depok,pelanggan042@example.com,0,0.67,49,1,
+CUST-0043,Yoga Hidayat,HomeNet 100 Mbps,450000,71,5,Tangerang,pelanggan043@example.com,0,0.47,40,0,
+CUST-0044,Andi Permata,HomeNet 50 Mbps,330000,53,21,Bandung,pelanggan044@example.com,0,0.48,48,1,
+CUST-0045,Yoga Nugroho,HomeNet 100 Mbps,450000,31,1,Jakarta,pelanggan045@example.com,9,7.58,219,6,"Teknisi tidak datang sesuai jadwal, kecewa dengan layanan"
+CUST-0046,Zahra Setiawan,HomeNet 300 Mbps,750000,17,21,Bogor,pelanggan046@example.com,1,0.57,14,0,
+CUST-0047,Sari Ramadhan,HomeNet 50 Mbps,330000,26,3,Jakarta,pelanggan047@example.com,1,0.49,52,0,
+CUST-0048,Citra Siregar,HomeNet 50 Mbps,330000,41,23,Surabaya,pelanggan048@example.com,0,1.42,25,0,
+CUST-0049,Fajar Permata,BizNet Office 100 Mbps,950000,72,6,Tangerang,pelanggan049@example.com,0,0.14,38,0,
+CUST-0050,Ayu Hidayat,HomeNet 300 Mbps,750000,64,9,Jakarta,pelanggan050@example.com,0,0.58,32,1,"Mau tanya, kalau berhenti langganan sebelum kontrak habis kena denda berapa?"
+CUST-0051,Ayu Utami,HomeNet 50 Mbps,330000,21,2,Surabaya,pelanggan051@example.com,9,4.51,199,3,"Latency tinggi saat jam sibuk, game dan video call lag"
+CUST-0052,Zahra Nugroho,HomeNet 300 Mbps,750000,42,16,Bandung,pelanggan052@example.com,1,1.46,50,0,
+CUST-0053,Andi Santoso,BizNet Office 100 Mbps,950000,15,21,Tangerang,pelanggan053@example.com,0,1.16,45,1,"Terima kasih teknisi kemarin cepat tanggap, mau tanya info upgrade paket"
+CUST-0054,Yoga Kusuma,BizNet Office 100 Mbps,950000,43,5,Medan,pelanggan054@example.com,0,0.82,29,1,"Mau tanya, kalau berhenti langganan sebelum kontrak habis kena denda berapa?"
+CUST-0055,Dimas Halim,BizNet Office 100 Mbps,950000,9,5,Jakarta,pelanggan055@example.com,1,0.87,21,0,
+CUST-0056,Fitri Wijaya,HomeNet 100 Mbps,450000,60,5,Jakarta,pelanggan056@example.com,0,0.29,46,0,
+CUST-0057,Rizky Nugroho,HomeNet 50 Mbps,330000,30,10,Medan,pelanggan057@example.com,1,0.79,46,0,
+CUST-0058,Reza Utami,HomeNet 100 Mbps,450000,26,0,Bogor,pelanggan058@example.com,7,2.72,81,2,"Latency tinggi saat jam sibuk, game dan video call lag"
+CUST-0059,Reza Kusuma,HomeNet 50 Mbps,330000,70,6,Surabaya,pelanggan059@example.com,2,1.46,25,0,
+CUST-0060,Dewi Ramadhan,HomeNet 100 Mbps,450000,29,3,Bekasi,pelanggan060@example.com,0,0.98,40,1,Minta info upgrade paket
+CUST-0061,Sari Wijaya,BizNet Office 100 Mbps,950000,56,7,Bogor,pelanggan061@example.com,0,0.34,53,1,"Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"
+CUST-0062,Dewi Ramadhan,HomeNet 100 Mbps,450000,19,16,Depok,pelanggan062@example.com,1,0.83,29,0,
+CUST-0063,Oki Santoso,HomeNet 100 Mbps,450000,12,9,Bandung,pelanggan063@example.com,1,0.99,15,0,
+CUST-0064,Citra Permata,BizNet Office 100 Mbps,950000,7,3,Semarang,pelanggan064@example.com,0,1.24,30,0,
+CUST-0065,Nisa Nugroho,HomeNet 300 Mbps,750000,4,18,Depok,pelanggan065@example.com,1,1.44,51,1,"Terima kasih teknisi kemarin cepat tanggap, mau tanya info upgrade paket"
+CUST-0066,Dewi Utami,BizNet Office 100 Mbps,950000,68,20,Bandung,pelanggan066@example.com,0,1.46,59,0,
+CUST-0067,Rizky Setiawan,HomeNet 100 Mbps,450000,32,13,Bandung,pelanggan067@example.com,0,0.55,41,0,
+CUST-0068,Rizky Pratama,HomeNet 300 Mbps,750000,50,19,Semarang,pelanggan068@example.com,0,0.71,19,1,
+CUST-0069,Kartika Hidayat,HomeNet 300 Mbps,750000,68,8,Surabaya,pelanggan069@example.com,1,0.75,20,0,
+CUST-0070,Teguh Saputra,BizNet Office 100 Mbps,950000,27,0,Medan,pelanggan070@example.com,7,7.28,122,6,"Kecepatan jauh di bawah paket, kerja dari rumah terganggu"
+CUST-0071,Indra Anggraini,HomeNet 300 Mbps,750000,69,6,Bandung,pelanggan071@example.com,0,0.44,15,0,
+CUST-0072,Arif Anggraini,BizNet Office 100 Mbps,950000,36,3,Tangerang,pelanggan072@example.com,6,5.52,89,4,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0073,Fitri Permata,HomeNet 100 Mbps,450000,71,23,Medan,pelanggan073@example.com,0,0.76,28,0,
+CUST-0074,Budi Pratama,HomeNet 50 Mbps,330000,13,15,Surabaya,pelanggan074@example.com,0,0.86,26,1,Minta info upgrade paket
+CUST-0075,Rizky Ramadhan,HomeNet 30 Mbps,250000,27,18,Bandung,pelanggan075@example.com,1,0.35,27,0,
+CUST-0076,Bayu Lestari,HomeNet 50 Mbps,330000,68,19,Semarang,pelanggan076@example.com,0,0.58,59,0,
+CUST-0077,Ayu Kusuma,HomeNet 50 Mbps,330000,2,5,Bekasi,pelanggan077@example.com,0,0.35,47,0,
+CUST-0078,Yoga Hidayat,HomeNet 300 Mbps,750000,4,3,Tangerang,pelanggan078@example.com,2,0.89,44,0,
+CUST-0079,Teguh Saputra,HomeNet 100 Mbps,450000,60,23,Tangerang,pelanggan079@example.com,0,1.46,33,0,
+CUST-0080,Andi Siregar,HomeNet 50 Mbps,330000,18,3,Medan,pelanggan080@example.com,1,1.41,42,0,
+CUST-0081,Oki Siregar,HomeNet 300 Mbps,750000,2,13,Bekasi,pelanggan081@example.com,0,0.72,30,0,
+CUST-0082,Fajar Siregar,HomeNet 300 Mbps,750000,59,9,Surabaya,pelanggan082@example.com,1,1.18,58,0,
+CUST-0083,Rina Ramadhan,HomeNet 100 Mbps,450000,39,7,Surabaya,pelanggan083@example.com,0,0.96,13,0,
+CUST-0084,Maya Lestari,HomeNet 100 Mbps,450000,70,21,Makassar,pelanggan084@example.com,0,0.42,20,0,
+CUST-0085,Budi Utami,BizNet Office 100 Mbps,950000,24,8,Makassar,pelanggan085@example.com,1,1.07,34,1,"Tagihan sudah sesuai, hanya konfirmasi"
+CUST-0086,Wulan Hidayat,HomeNet 100 Mbps,450000,65,13,Jakarta,pelanggan086@example.com,1,1.04,20,1,Tanya cara ganti password WiFi
+CUST-0087,Lestari Setiawan,BizNet Office 100 Mbps,950000,66,22,Bandung,pelanggan087@example.com,0,1.27,26,0,
+CUST-0088,Lestari Setiawan,BizNet Office 100 Mbps,950000,50,8,Jakarta,pelanggan088@example.com,1,0.84,36,0,
+CUST-0089,Citra Saputra,BizNet Office 100 Mbps,950000,71,1,Bekasi,pelanggan089@example.com,0,0.71,24,0,
+CUST-0090,Kartika Hidayat,HomeNet 30 Mbps,250000,32,14,Jakarta,pelanggan090@example.com,0,0.99,52,0,
+CUST-0091,Citra Nugroho,HomeNet 300 Mbps,750000,25,11,Tangerang,pelanggan091@example.com,0,1.0,24,1,Tanya cara ganti password WiFi
+CUST-0092,Zahra Santoso,HomeNet 300 Mbps,750000,13,5,Surabaya,pelanggan092@example.com,0,1.39,47,1,"Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"
+CUST-0093,Fitri Kusuma,HomeNet 30 Mbps,250000,54,2,Bekasi,pelanggan093@example.com,0,0.73,34,0,
+CUST-0094,Indra Ramadhan,BizNet Office 100 Mbps,950000,41,5,Surabaya,pelanggan094@example.com,1,0.25,22,0,
+CUST-0095,Kartika Kusuma,HomeNet 50 Mbps,330000,35,19,Makassar,pelanggan095@example.com,0,0.67,52,0,
+CUST-0096,Rizky Santoso,HomeNet 100 Mbps,450000,6,9,Bogor,pelanggan096@example.com,1,0.83,45,1,"Tagihan sudah sesuai, hanya konfirmasi"
+CUST-0097,Indra Hidayat,HomeNet 100 Mbps,450000,41,17,Bekasi,pelanggan097@example.com,2,0.93,22,0,
+CUST-0098,Yoga Kusuma,HomeNet 50 Mbps,330000,25,0,Makassar,pelanggan098@example.com,4,5.8,166,4,"Sering disconnect saat meeting online, mempertimbangkan pindah provider"
+CUST-0099,Andi Nugroho,BizNet Office 100 Mbps,950000,63,9,Surabaya,pelanggan099@example.com,0,1.16,36,0,
+CUST-0100,Indra Kusuma,BizNet Office 100 Mbps,950000,25,0,Bogor,pelanggan100@example.com,8,4.12,219,2,"Sering disconnect saat meeting online, mempertimbangkan pindah provider"
+CUST-0101,Dewi Setiawan,HomeNet 100 Mbps,450000,18,10,Surabaya,pelanggan101@example.com,1,0.86,18,0,
+CUST-0102,Ayu Permata,HomeNet 30 Mbps,250000,19,2,Jakarta,pelanggan102@example.com,0,1.5,59,1,
+CUST-0103,Joko Wijaya,HomeNet 100 Mbps,450000,55,2,Bogor,pelanggan103@example.com,0,0.88,40,0,
+CUST-0104,Oki Halim,BizNet Office 100 Mbps,950000,54,19,Depok,pelanggan104@example.com,1,1.1,16,1,
+CUST-0105,Rizky Siregar,HomeNet 100 Mbps,450000,61,9,Depok,pelanggan105@example.com,0,1.21,39,0,
+CUST-0106,Citra Nugroho,HomeNet 50 Mbps,330000,51,15,Surabaya,pelanggan106@example.com,2,0.51,18,0,
+CUST-0107,Indra Saputra,HomeNet 30 Mbps,250000,45,7,Bogor,pelanggan107@example.com,2,0.23,47,0,
+CUST-0108,Eko Lestari,HomeNet 30 Mbps,250000,23,5,Medan,pelanggan108@example.com,0,1.07,41,0,
+CUST-0109,Lestari Santoso,HomeNet 30 Mbps,250000,24,7,Bekasi,pelanggan109@example.com,1,1.01,35,0,
+CUST-0110,Fajar Hidayat,BizNet Office 100 Mbps,950000,26,6,Semarang,pelanggan110@example.com,5,6.89,216,2,"Bayar 100 Mbps dapetnya kayak 10, tetangga pakai provider sebelah lancar-lancar aja"
+CUST-0111,Joko Hidayat,HomeNet 30 Mbps,250000,63,3,Depok,pelanggan111@example.com,0,0.46,55,1,"Tagihan sudah sesuai, hanya konfirmasi"
+CUST-0112,Arif Permata,HomeNet 30 Mbps,250000,27,21,Jakarta,pelanggan112@example.com,0,1.16,17,0,
+CUST-0113,Lestari Setiawan,HomeNet 100 Mbps,450000,18,6,Makassar,pelanggan113@example.com,6,7.88,185,4,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0114,Reza Ramadhan,HomeNet 50 Mbps,330000,70,13,Bekasi,pelanggan114@example.com,0,0.88,45,0,
+CUST-0115,Reza Halim,HomeNet 30 Mbps,250000,20,16,Semarang,pelanggan115@example.com,2,0.17,50,0,
+CUST-0116,Indra Lestari,HomeNet 100 Mbps,450000,28,21,Semarang,pelanggan116@example.com,0,0.26,39,0,
+CUST-0117,Ayu Lestari,HomeNet 30 Mbps,250000,29,1,Makassar,pelanggan117@example.com,8,7.84,201,4,"Bayar 100 Mbps dapetnya kayak 10, tetangga pakai provider sebelah lancar-lancar aja"
+CUST-0118,Bayu Nugroho,HomeNet 50 Mbps,330000,35,6,Tangerang,pelanggan118@example.com,6,7.17,135,6,"Teknisi tidak datang sesuai jadwal, kecewa dengan layanan"
+CUST-0119,Indra Setiawan,HomeNet 50 Mbps,330000,60,15,Bogor,pelanggan119@example.com,0,1.4,51,1,Tanya cara ganti password WiFi
+CUST-0120,Fajar Nugroho,HomeNet 30 Mbps,250000,67,17,Surabaya,pelanggan120@example.com,1,0.57,16,1,
+CUST-0121,Wulan Halim,HomeNet 30 Mbps,250000,35,8,Bogor,pelanggan121@example.com,0,0.45,32,0,
+CUST-0122,Indra Ramadhan,HomeNet 300 Mbps,750000,18,18,Bogor,pelanggan122@example.com,1,1.15,59,0,
+CUST-0123,Citra Pratama,HomeNet 50 Mbps,330000,2,24,Jakarta,pelanggan123@example.com,0,0.97,37,0,
+CUST-0124,Oki Ramadhan,HomeNet 30 Mbps,250000,4,2,Jakarta,pelanggan124@example.com,2,0.28,13,1,"Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"
+CUST-0125,Budi Hidayat,BizNet Office 100 Mbps,950000,6,3,Medan,pelanggan125@example.com,4,7.84,89,4,"Bayar 100 Mbps dapetnya kayak 10, tetangga pakai provider sebelah lancar-lancar aja"
+CUST-0126,Hana Permata,HomeNet 30 Mbps,250000,5,6,Tangerang,pelanggan126@example.com,0,0.6,17,0,
+CUST-0127,Maya Lestari,HomeNet 30 Mbps,250000,23,10,Semarang,pelanggan127@example.com,0,0.98,12,0,
+CUST-0128,Nisa Wijaya,HomeNet 300 Mbps,750000,12,2,Surabaya,pelanggan128@example.com,0,1.37,23,0,
+CUST-0129,Wulan Utami,BizNet Office 100 Mbps,950000,45,1,Depok,pelanggan129@example.com,0,1.19,40,1,
+CUST-0130,Budi Setiawan,BizNet Office 100 Mbps,950000,64,7,Depok,pelanggan130@example.com,1,1.29,16,0,
+CUST-0131,Arif Hidayat,HomeNet 30 Mbps,250000,15,19,Semarang,pelanggan131@example.com,0,0.61,19,0,
+CUST-0132,Maya Lestari,HomeNet 300 Mbps,750000,56,2,Bandung,pelanggan132@example.com,0,0.54,46,0,
+CUST-0133,Dewi Santoso,HomeNet 100 Mbps,450000,36,5,Depok,pelanggan133@example.com,0,0.46,58,0,
+CUST-0134,Teguh Pratama,HomeNet 50 Mbps,330000,23,17,Makassar,pelanggan134@example.com,2,1.5,37,0,
+CUST-0135,Fajar Hidayat,HomeNet 50 Mbps,330000,13,1,Depok,pelanggan135@example.com,8,7.41,114,4,"Internet putus-putus setiap malam, sudah lapor 3 kali belum beres"
+CUST-0136,Kartika Saputra,HomeNet 30 Mbps,250000,40,1,Semarang,pelanggan136@example.com,2,0.27,45,1,"Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"
+CUST-0137,Maya Siregar,HomeNet 30 Mbps,250000,24,11,Bandung,pelanggan137@example.com,0,0.42,52,0,
+CUST-0138,Rina Pratama,HomeNet 300 Mbps,750000,52,15,Medan,pelanggan138@example.com,0,1.48,42,0,
+CUST-0139,Oki Pratama,BizNet Office 100 Mbps,950000,9,13,Jakarta,pelanggan139@example.com,0,0.34,24,0,
+CUST-0140,Hana Wijaya,HomeNet 50 Mbps,330000,35,7,Semarang,pelanggan140@example.com,2,0.91,50,0,
+CUST-0141,Fajar Utami,HomeNet 300 Mbps,750000,8,4,Jakarta,pelanggan141@example.com,0,0.15,24,0,
+CUST-0142,Bayu Anggraini,HomeNet 300 Mbps,750000,17,3,Bogor,pelanggan142@example.com,2,1.1,60,1,Minta info upgrade paket
+CUST-0143,Andi Ramadhan,HomeNet 100 Mbps,450000,30,6,Bekasi,pelanggan143@example.com,5,5.55,89,6,"Sinyal hilang tiap hujan, anak sekolah online jadi ketinggalan pelajaran"
+CUST-0144,Rina Saputra,HomeNet 50 Mbps,330000,49,1,Bekasi,pelanggan144@example.com,0,0.32,34,0,
+CUST-0145,Teguh Pratama,HomeNet 50 Mbps,330000,16,10,Medan,pelanggan145@example.com,0,1.25,44,0,
+CUST-0146,Fajar Saputra,HomeNet 50 Mbps,330000,18,12,Depok,pelanggan146@example.com,1,1.13,16,0,
+CUST-0147,Putri Kusuma,HomeNet 50 Mbps,330000,64,7,Jakarta,pelanggan147@example.com,1,1.34,56,1,
+CUST-0148,Indra Wijaya,HomeNet 30 Mbps,250000,21,10,Semarang,pelanggan148@example.com,0,0.5,36,0,
+CUST-0149,Maya Kusuma,HomeNet 30 Mbps,250000,34,10,Jakarta,pelanggan149@example.com,0,0.96,52,1,
+CUST-0150,Teguh Kusuma,HomeNet 300 Mbps,750000,5,2,Bandung,pelanggan150@example.com,7,3.75,93,4,"Teknisi tidak datang sesuai jadwal, kecewa dengan layanan"

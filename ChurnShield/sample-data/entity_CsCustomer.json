@@ -1,0 +1,14 @@
+{"displayName":"CsCustomer","description":"ChurnShield synthetic broadband customers with 30-day network KPIs","fields":[
+{"name":"CustomerCode","type":"STRING","isRequired":true},
+{"name":"CustomerName","type":"STRING"},
+{"name":"ServicePlan","type":"STRING"},
+{"name":"MonthlyFee","type":"DECIMAL","decimalPrecision":0},
+{"name":"TenureMonths","type":"DECIMAL","decimalPrecision":0},
+{"name":"ContractMonthsLeft","type":"DECIMAL","decimalPrecision":0},
+{"name":"City","type":"STRING"},
+{"name":"ContactEmail","type":"STRING"},
+{"name":"Outages30d","type":"DECIMAL","decimalPrecision":0},
+{"name":"AvgPacketLoss","type":"DECIMAL","decimalPrecision":2},
+{"name":"AvgLatencyMs","type":"DECIMAL","decimalPrecision":0},
+{"name":"Complaints30d","type":"DECIMAL","decimalPrecision":0},
+{"name":"LastComplaint","type":"MULTILINE_TEXT","lengthLimit":2000}]}

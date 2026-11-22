@@ -1,0 +1,69 @@
+{
+  "version": "1.2.0",
+  "settings": {
+    "model": "anthropic.claude-sonnet-5",
+    "maxTokens": 16384,
+    "temperature": 1,
+    "engine": "basic-v2",
+    "maxIterations": 25,
+    "mode": "standard"
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "buildFeatures__output__complaintLines": {
+        "type": "string"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "negativeCodes": {
+        "type": "string"
+      },
+      "churnIntentCodes": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      }
+    }
+  },
+  "metadata": {
+    "storageVersion": "50.0.0",
+    "isConversational": false,
+    "showProjectCreationExperience": false
+  },
+  "type": "lowCode",
+  "guardrails": [],
+  "messages": [
+    {
+      "role": "system",
+      "content": "Kamu menganalisis keluhan pelanggan ISP di Indonesia, termasuk bahasa gaul dan sindiran. Setiap baris berformat 'KODE | teks keluhan'. Nilai setiap keluhan HANYA dari teksnya. Negatif: pelanggan kesal, kecewa, atau mengeluhkan layanan (bukan sekadar bertanya). Niat berhenti: pelanggan menyebut, menyiratkan, atau menanyakan berhenti langganan, pindah provider, membandingkan dengan provider lain, atau mengancam berhenti (misalnya 'cabut', 'stop langganan', 'provider sebelah'). Pertanyaan biasa atau ucapan terima kasih bukan negatif. Kata 'lagi' bukan 'lag'. Return a result conforming to the output schema. negativeCodes: kode pelanggan yang keluhannya negatif, dipisah koma, kosong bila tidak ada. churnIntentCodes: kode pelanggan yang menunjukkan niat berhenti (negatif atau tidak), dipisah koma, kosong bila tidak ada. notes: 1-2 kalimat pola utama keluhan.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Kamu menganalisis keluhan pelanggan ISP di Indonesia, termasuk bahasa gaul dan sindiran. Setiap baris berformat 'KODE | teks keluhan'. Nilai setiap keluhan HANYA dari teksnya. Negatif: pelanggan kesal, kecewa, atau mengeluhkan layanan (bukan sekadar bertanya). Niat berhenti: pelanggan menyebut, menyiratkan, atau menanyakan berhenti langganan, pindah provider, membandingkan dengan provider lain, atau mengancam berhenti (misalnya 'cabut', 'stop langganan', 'provider sebelah'). Pertanyaan biasa atau ucapan terima kasih bukan negatif. Kata 'lagi' bukan 'lag'. Return a result conforming to the output schema. negativeCodes: kode pelanggan yang keluhannya negatif, dipisah koma, kosong bila tidak ada. churnIntentCodes: kode pelanggan yang menunjukkan niat berhenti (negatif atau tidak), dipisah koma, kosong bila tidak ada. notes: 1-2 kalimat pola utama keluhan."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Keluhan pelanggan:\n{{input.buildFeatures__output__complaintLines}}",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Keluhan pelanggan:\n"
+        },
+        {
+          "type": "variable",
+          "rawString": "input.buildFeatures__output__complaintLines"
+        }
+      ]
+    }
+  ],
+  "projectId": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
+  "id": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
+  "name": "analyzeComplaints"
+}
