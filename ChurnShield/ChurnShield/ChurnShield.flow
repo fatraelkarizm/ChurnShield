@@ -24,7 +24,7 @@
           "var": "output"
         }
       },
-      "uniqueId": "5594d5a2-649d-4b80-8ca1-bf502d14698e"
+      "uniqueId": "91895fd9-c23f-4cdb-add6-ec2fcf5f7fd8"
     },
     {
       "id": "newRun",
@@ -85,7 +85,7 @@
           }
         }
       },
-      "uniqueId": "7db33190-b8cf-43ad-8e78-a0f016862a2d"
+      "uniqueId": "2c895450-a455-443b-abe4-fd18bd6e1620"
     },
     {
       "id": "readCustomers",
@@ -114,7 +114,7 @@
           "var": "output"
         }
       },
-      "uniqueId": "a93db4a9-e491-4c23-a3cc-3726f81177e3"
+      "uniqueId": "ad25946e-2ffb-4f86-b0ce-d11df2ba34b4"
     },
     {
       "id": "readTickets",
@@ -150,7 +150,7 @@
           "var": "output"
         }
       },
-      "uniqueId": "0753af52-a2d1-4390-abe1-baeb2dc4f25b"
+      "uniqueId": "f2dae934-6e75-47a5-8270-b2108c3adb55"
     },
     {
       "id": "readCases",
@@ -179,7 +179,7 @@
           "var": "output"
         }
       },
-      "uniqueId": "f39df9c4-ef20-4f3b-8ed8-aebcfa54e222"
+      "uniqueId": "9f2cdc79-67e7-410e-9b58-33a4927622cb"
     },
     {
       "id": "ingest",
@@ -190,7 +190,7 @@
         "icon": "merge"
       },
       "inputs": {},
-      "uniqueId": "7c846533-7200-4f7e-80cf-e33f8177e3c4"
+      "uniqueId": "f56f8502-0a13-4c87-a323-3074b1e2a9db"
     },
     {
       "id": "buildFeatures",
@@ -201,7 +201,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n      const customers = $vars.readCustomers.output.results || [];\n      const tickets = $vars.readTickets.output.results || [];\n      const now = Date.now();\n      const byCustomer = {};\n      for (const t of tickets) {\n        const hoursOpen = (now - new Date(t.OpenedAt).getTime()) / 3600000;\n        const overdueBy = hoursOpen - Number(t.SlaHours || 0);\n        const row = { id: t.Id, code: t.TicketCode, category: t.Category, overdueBy: overdueBy };\n        (byCustomer[t.CustomerCode] = byCustomer[t.CustomerCode] || []).push(row);\n      }\n      const features = customers.map((c) => {\n        const open = byCustomer[c.CustomerCode] || [];\n        const overdue = open.filter((t) => t.overdueBy > 0).sort((x, y) => y.overdueBy - x.overdueBy);\n        const worst = overdue[0];\n        return {\n          customerCode: c.CustomerCode, customerName: c.CustomerName, servicePlan: c.ServicePlan,\n          monthlyFee: Number(c.MonthlyFee || 0), city: c.City, contactEmail: c.ContactEmail,\n          tenureMonths: Number(c.TenureMonths || 0), contractMonthsLeft: Number(c.ContractMonthsLeft || 0),\n          outages30d: Number(c.Outages30d || 0), avgPacketLoss: Number(c.AvgPacketLoss || 0),\n          avgLatencyMs: Number(c.AvgLatencyMs || 0), complaints30d: Number(c.Complaints30d || 0),\n          lastComplaint: c.LastComplaint || \"\",\n          openTickets: open.length, overdueTickets: overdue.length,\n          overdueTicketId: worst ? worst.id : \"\", overdueTicketCode: worst ? worst.code : \"\",\n          overdueTicketCategory: worst ? worst.category : \"\",\n          hoursOverdue: worst ? Math.round(worst.overdueBy) : 0,\n          revenueAtRisk: Number(c.MonthlyFee || 0) * 12\n        };\n      });\n      return { features: features, customerCount: features.length, openTicketCount: tickets.length };\n    "
+        "script": "\n      const customers = $vars.readCustomers.output.results || [];\n      const tickets = $vars.readTickets.output.results || [];\n      const now = Date.now();\n      const byCustomer = {};\n      for (const t of tickets) {\n        const hoursOpen = (now - new Date(t.OpenedAt).getTime()) / 3600000;\n        const overdueBy = hoursOpen - Number(t.SlaHours || 0);\n        const row = { id: t.Id, code: t.TicketCode, category: t.Category, overdueBy: overdueBy };\n        (byCustomer[t.CustomerCode] = byCustomer[t.CustomerCode] || []).push(row);\n      }\n      const features = customers.map((c) => {\n        const open = byCustomer[c.CustomerCode] || [];\n        const overdue = open.filter((t) => t.overdueBy > 0).sort((x, y) => y.overdueBy - x.overdueBy);\n        const worst = overdue[0];\n        return {\n          customerCode: c.CustomerCode, customerName: c.CustomerName, servicePlan: c.ServicePlan,\n          monthlyFee: Number(c.MonthlyFee || 0), city: c.City, contactEmail: c.ContactEmail,\n          tenureMonths: Number(c.TenureMonths || 0), contractMonthsLeft: Number(c.ContractMonthsLeft || 0),\n          outages30d: Number(c.Outages30d || 0), avgPacketLoss: Number(c.AvgPacketLoss || 0),\n          avgLatencyMs: Number(c.AvgLatencyMs || 0), complaints30d: Number(c.Complaints30d || 0),\n          lastComplaint: c.LastComplaint || \"\",\n          openTickets: open.length, overdueTickets: overdue.length,\n          overdueTicketId: worst ? worst.id : \"\", overdueTicketCode: worst ? worst.code : \"\",\n          overdueTicketCategory: worst ? worst.category : \"\",\n          hoursOverdue: worst ? Math.round(worst.overdueBy) : 0,\n          revenueAtRisk: Number(c.MonthlyFee || 0) * 12\n        };\n      });\n      const complaintLines = features.filter((f) => String(f.lastComplaint).trim() !== \"\")\n        .map((f) => f.customerCode + \" | \" + f.lastComplaint).join(\"\\n\");\n      return { features: features, customerCount: features.length, openTicketCount: tickets.length,\n        complaintLines: complaintLines };\n    "
       },
       "outputs": {
         "output": {
@@ -218,6 +218,9 @@
             },
             "openTicketCount": {
               "type": "number"
+            },
+            "complaintLines": {
+              "type": "string"
             }
           }
         },
@@ -262,7 +265,156 @@
           }
         }
       },
-      "uniqueId": "14b4069f-6de7-476e-97c6-e7b20f635aea"
+      "uniqueId": "4731bc1f-2039-41f2-ab10-c8f937e212fd"
+    },
+    {
+      "id": "analyzeComplaints",
+      "type": "uipath.agent.autonomous",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "analyzeComplaints",
+        "icon": "autonomous-agent"
+      },
+      "inputs": {
+        "systemPrompt": "Kamu menganalisis keluhan pelanggan ISP di Indonesia, termasuk bahasa gaul dan sindiran. Setiap baris berformat 'KODE | teks keluhan'. Nilai setiap keluhan HANYA dari teksnya. Negatif: pelanggan kesal, kecewa, atau mengeluhkan layanan (bukan sekadar bertanya). Niat berhenti: pelanggan menyebut, menyiratkan, atau menanyakan berhenti langganan, pindah provider, membandingkan dengan provider lain, atau mengancam berhenti (misalnya 'cabut', 'stop langganan', 'provider sebelah'). Pertanyaan biasa atau ucapan terima kasih bukan negatif. Kata 'lagi' bukan 'lag'. Return a result conforming to the output schema. negativeCodes: kode pelanggan yang keluhannya negatif, dipisah koma, kosong bila tidak ada. churnIntentCodes: kode pelanggan yang menunjukkan niat berhenti (negatif atau tidak), dipisah koma, kosong bila tidak ada. notes: 1-2 kalimat pola utama keluhan.",
+        "userPrompt": "Keluhan pelanggan:\n{{ $vars.buildFeatures.output.complaintLines }}",
+        "model": "anthropic.claude-sonnet-5",
+        "mode": "standard",
+        "temperature": 1,
+        "maxTokenPerResponse": 16384,
+        "maxIterations": 25,
+        "isConversational": false,
+        "guardrails": [],
+        "name": "analyzeComplaints",
+        "agentInputVariables": [
+          {
+            "id": "buildFeatures__output__complaintLines",
+            "type": "string",
+            "binding": "=js:$vars.buildFeatures.output.complaintLines"
+          }
+        ],
+        "agentOutputVariables": [
+          {
+            "id": "negativeCodes",
+            "type": "string"
+          },
+          {
+            "id": "churnIntentCodes",
+            "type": "string"
+          },
+          {
+            "id": "notes",
+            "type": "string"
+          }
+        ],
+        "source": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
+        "modelSkipsTemperature": true,
+        "errorHandlingEnabled": true
+      },
+      "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "8fbbe6be-017f-4751-b9aa-1187ca45a984"
+    },
+    {
+      "id": "complaintFallback",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "complaintFallback",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": "return \"Analisis keluhan AI gagal; sinyal keluhan memakai daftar kata kunci\";"
+      },
+      "outputs": {
+        "output": {
+          "type": "string",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "uniqueId": "1d20af84-8c3d-4207-9d32-60171f673192"
     },
     {
       "id": "scoreRules",
@@ -273,7 +425,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n      const negative = [\"pindah provider\", \"kecewa\", \"putus\", \"berhenti\", \"lag\", \"terganggu\"];\n      const scored = $vars.buildFeatures.output.features.map((f) => {\n        const reasons = [];\n        let s = 0;\n        const add = (w, why) => { if (w > 0) { s += w; reasons.push(why); } };\n        add(Math.min(f.outages30d / 6, 1) * 0.25, f.outages30d + \" gangguan dalam 30 hari\");\n        add(Math.min(f.avgPacketLoss / 5, 1) * 0.15 * (f.avgPacketLoss >= 2 ? 1 : 0), \"packet loss rata-rata \" + f.avgPacketLoss + \"%\");\n        add(Math.min(Math.max(f.avgLatencyMs - 60, 0) / 150, 1) * 0.10, \"latency rata-rata \" + f.avgLatencyMs + \" ms\");\n        add(Math.min(f.complaints30d / 4, 1) * 0.15 * (f.complaints30d >= 2 ? 1 : 0), f.complaints30d + \" keluhan dalam 30 hari\");\n        const text = String(f.lastComplaint).toLowerCase();\n        if (negative.some((w) => text.indexOf(w) >= 0)) add(0.10, \"keluhan bernada negatif: \\\"\" + f.lastComplaint + \"\\\"\");\n        if (f.overdueTickets > 0) add(0.15, \"tiket \" + f.overdueTicketCode + \" lewat SLA \" + f.hoursOverdue + \" jam\");\n        if (f.contractMonthsLeft <= 0) add(0.10, \"kontrak sudah habis bulan ini\");\n        else if (f.contractMonthsLeft <= 1) add(0.10, \"kontrak habis dalam 1 bulan\");\n        else if (f.contractMonthsLeft <= 3) add(0.05, \"kontrak habis dalam \" + f.contractMonthsLeft + \" bulan\");\n        if (f.tenureMonths < 6) add(0.05, \"pelanggan baru (\" + f.tenureMonths + \" bulan)\");\n        const score = Math.round(Math.min(s, 1) * 100) / 100;\n        return Object.assign({}, f, {\n          churnScore: score,\n          riskLevel: score >= 0.75 ? \"Very High\" : score >= 0.6 ? \"High\" : score >= 0.35 ? \"Medium\" : \"Low\",\n          reasons: reasons.length ? reasons.join(\"; \") : \"tidak ada sinyal risiko signifikan\"\n        });\n      });\n      return { scored: scored };\n    "
+        "script": "\n      const negative = [\"pindah provider\", \"kecewa\", \"putus\", \"berhenti\", \"lag\", \"terganggu\"];\n      const codes = (s) => String(s || \"\").split(\",\").map((x) => x.trim().toUpperCase()).filter((x) => x !== \"\");\n      const aiMode = $vars.complaintMode === \"ai\";\n      const aiNeg = codes($vars.aiNegative), aiIntent = codes($vars.aiIntent);\n      const scored = $vars.buildFeatures.output.features.map((f) => {\n        const reasons = [];\n        let s = 0;\n        const add = (w, why) => { if (w > 0) { s += w; reasons.push(why); } };\n        add(Math.min(f.outages30d / 6, 1) * 0.25, f.outages30d + \" gangguan dalam 30 hari\");\n        add(Math.min(f.avgPacketLoss / 5, 1) * 0.15 * (f.avgPacketLoss >= 2 ? 1 : 0), \"packet loss rata-rata \" + f.avgPacketLoss + \"%\");\n        add(Math.min(Math.max(f.avgLatencyMs - 60, 0) / 150, 1) * 0.10, \"latency rata-rata \" + f.avgLatencyMs + \" ms\");\n        add(Math.min(f.complaints30d / 4, 1) * 0.15 * (f.complaints30d >= 2 ? 1 : 0), f.complaints30d + \" keluhan dalam 30 hari\");\n        let intent = false;\n        if (aiMode) {\n          intent = aiIntent.indexOf(f.customerCode) >= 0;\n          if (intent) add(0.10, \"AI: keluhan menunjukkan niat berhenti: \\\"\" + f.lastComplaint + \"\\\"\");\n          else if (aiNeg.indexOf(f.customerCode) >= 0) add(0.07, \"AI: keluhan bernada negatif: \\\"\" + f.lastComplaint + \"\\\"\");\n        } else {\n          const text = String(f.lastComplaint).toLowerCase();\n          if (negative.some((w) => text.indexOf(w) >= 0)) add(0.10, \"keluhan bernada negatif (kata kunci): \\\"\" + f.lastComplaint + \"\\\"\");\n        }\n        if (f.overdueTickets > 0) add(0.15, \"tiket \" + f.overdueTicketCode + \" lewat SLA \" + f.hoursOverdue + \" jam\");\n        if (f.contractMonthsLeft <= 0) add(0.10, \"kontrak sudah habis bulan ini\");\n        else if (f.contractMonthsLeft <= 1) add(0.10, \"kontrak habis dalam 1 bulan\");\n        else if (f.contractMonthsLeft <= 3) add(0.05, \"kontrak habis dalam \" + f.contractMonthsLeft + \" bulan\");\n        if (f.tenureMonths < 6) add(0.05, \"pelanggan baru (\" + f.tenureMonths + \" bulan)\");\n        const score = Math.round(Math.min(s, 1) * 100) / 100;\n        return Object.assign({}, f, {\n          churnScore: score, churnIntent: intent,\n          riskLevel: score >= 0.75 ? \"Very High\" : score >= 0.6 ? \"High\" : score >= 0.35 ? \"Medium\" : \"Low\",\n          reasons: reasons.length ? reasons.join(\"; \") : \"tidak ada sinyal risiko signifikan\"\n        });\n      });\n      return { scored: scored };\n    "
       },
       "outputs": {
         "output": {
@@ -328,7 +480,7 @@
           }
         }
       },
-      "uniqueId": "651ff0ff-0021-4c19-8b12-609c4f9fc582"
+      "uniqueId": "01413492-fb58-42aa-80c6-57534c6398a0"
     },
     {
       "id": "useExternalModel",
@@ -343,7 +495,7 @@
         "falseLabel": "False",
         "expression": "$vars.cfgMode === \"external\" && $vars.cfgModelUrl !== \"\""
       },
-      "uniqueId": "e6fec5dd-d3f2-4860-b5dd-af7099761a63"
+      "uniqueId": "89ba1ab8-b436-466a-b051-18cfba72c46b"
     },
     {
       "id": "callModel",
@@ -469,7 +621,7 @@
           }
         }
       },
-      "uniqueId": "f8294d0f-6457-4c33-87e1-7be4610de777"
+      "uniqueId": "f49abae2-ced7-4560-adfd-d5992d8828c6"
     },
     {
       "id": "modelFallback",
@@ -530,7 +682,7 @@
           }
         }
       },
-      "uniqueId": "8840605f-6695-4e84-8ce8-4f8009b5f389"
+      "uniqueId": "77b0c795-9249-4079-a2b5-8a734cae3449"
     },
     {
       "id": "mergeModelScores",
@@ -599,7 +751,7 @@
           }
         }
       },
-      "uniqueId": "b0b236aa-234c-47ee-9711-58691a44b106"
+      "uniqueId": "1fd7b8c2-28ae-4889-a87d-daf78e6fac98"
     },
     {
       "id": "prioritize",
@@ -610,7 +762,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n      const threshold = Number($vars.cfgThreshold);\n      const topN = Math.max(0, Math.floor(Number($vars.cfgTopN)));\n      const now = Date.now();\n      const cooldownMs = Math.max(0, Number($vars.cfgCooldownDays)) * 86400000;\n      const slaMs = Math.max(0, Number($vars.cfgSlaHours)) * 3600000;\n      const openStatuses = [\"Analyzing\", \"Pending Approval\", \"Follow-up Ready\"];\n      const cases = $vars.readCases.output.results || [];\n      const blocked = {};\n      const overdue = [];\n      for (const c of cases) {\n        const age = now - new Date(c.CreateTime).getTime();\n        const open = openStatuses.indexOf(c.CaseStatus) >= 0;\n        // a supervisor-rejected offer never reached the customer, so it does not start the contact cooldown\n        const contacted = c.CaseStatus !== \"Closed - Offer Rejected\";\n        if (open || (contacted && age < cooldownMs)) {\n          if (!blocked[c.CustomerCode]) blocked[c.CustomerCode] = open ? \"kasus \" + c.CaseStatus + \" (\" + c.RunId + \")\" : \"sudah ditangani \" + Math.floor(age / 86400000) + \" hari lalu\";\n        }\n        if (c.CaseStatus === \"Pending Approval\" && age >= slaMs && c.ApprovalOverdue !== true) {\n          overdue.push({ id: c.Id, customerCode: c.CustomerCode, customerName: c.CustomerName, runId: c.RunId, hoursWaiting: Math.floor(age / 3600000) });\n        }\n      }\n      const high = $vars.scored.filter((r) => r.churnScore >= threshold);\n      high.sort((a, b) => (b.churnScore * b.revenueAtRisk) - (a.churnScore * a.revenueAtRisk));\n      const eligible = high.filter((r) => !blocked[r.customerCode]);\n      const skipped = high.filter((r) => blocked[r.customerCode]).map((r) => ({ customer: r.customerCode + \" \" + r.customerName, reason: blocked[r.customerCode] }));\n      const top = eligible.slice(0, topN);\n      const total = high.reduce((s, r) => s + r.revenueAtRisk, 0);\n      return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length,\n        skipped: skipped, overdue: overdue };\n    "
+        "script": "\n      const threshold = Number($vars.cfgThreshold);\n      const topN = Math.max(0, Math.floor(Number($vars.cfgTopN)));\n      const now = Date.now();\n      const cooldownMs = Math.max(0, Number($vars.cfgCooldownDays)) * 86400000;\n      const slaMs = Math.max(0, Number($vars.cfgSlaHours)) * 3600000;\n      const openStatuses = [\"Analyzing\", \"Pending Approval\", \"Follow-up Ready\", \"Needs Manual Review\"];\n      const cases = $vars.readCases.output.results || [];\n      const blocked = {};\n      const overdue = [];\n      for (const c of cases) {\n        const age = now - new Date(c.CreateTime).getTime();\n        const open = openStatuses.indexOf(c.CaseStatus) >= 0;\n        // a supervisor-rejected offer never reached the customer, so it does not start the contact cooldown\n        const contacted = c.CaseStatus !== \"Closed - Offer Rejected\";\n        if (open || (contacted && age < cooldownMs)) {\n          if (!blocked[c.CustomerCode]) blocked[c.CustomerCode] = open ? \"kasus \" + c.CaseStatus + \" (\" + c.RunId + \")\" : \"sudah ditangani \" + Math.floor(age / 86400000) + \" hari lalu\";\n        }\n        if (c.CaseStatus === \"Pending Approval\" && age >= slaMs && c.ApprovalOverdue !== true) {\n          overdue.push({ id: c.Id, customerCode: c.CustomerCode, customerName: c.CustomerName, runId: c.RunId, hoursWaiting: Math.floor(age / 3600000) });\n        }\n      }\n      const high = $vars.scored.filter((r) => r.churnScore >= threshold);\n      high.sort((a, b) => (b.churnScore * b.revenueAtRisk) - (a.churnScore * a.revenueAtRisk));\n      const eligible = high.filter((r) => !blocked[r.customerCode]);\n      const skipped = high.filter((r) => blocked[r.customerCode]).map((r) => ({ customer: r.customerCode + \" \" + r.customerName, reason: blocked[r.customerCode] }));\n      const top = eligible.slice(0, topN);\n      const total = high.reduce((s, r) => s + r.revenueAtRisk, 0);\n      // early warning: the score is still low, but the AI read an intent to leave in the complaint\n      const hiddenIntent = $vars.scored.filter((r) => r.churnIntent && r.churnScore < threshold)\n        .map((r) => ({ customer: r.customerCode + \" \" + r.customerName, churnScore: r.churnScore, complaint: r.lastComplaint }));\n      return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length,\n        skipped: skipped, overdue: overdue, hiddenIntent: hiddenIntent };\n    "
       },
       "outputs": {
         "output": {
@@ -635,6 +787,9 @@
               "type": "array"
             },
             "overdue": {
+              "type": "array"
+            },
+            "hiddenIntent": {
               "type": "array"
             }
           }
@@ -680,7 +835,7 @@
           }
         }
       },
-      "uniqueId": "38629086-1446-474a-b44c-ffc8b383d803"
+      "uniqueId": "a9bebda5-6a4e-4516-b453-fd966c15f3e7"
     },
     {
       "id": "eachOverdue",
@@ -769,7 +924,7 @@
           }
         }
       },
-      "uniqueId": "c2040e33-354c-4320-9c94-f06a03e1d38e"
+      "uniqueId": "78a1e758-e976-4b04-bd3b-b997572ff939"
     },
     {
       "id": "flagOverdue",
@@ -801,7 +956,7 @@
         }
       },
       "parentId": "eachOverdue",
-      "uniqueId": "7750edbe-df6d-4177-8dbe-745c3a0030ae"
+      "uniqueId": "394f0df1-1557-4734-a092-f0f73295c9ee"
     },
     {
       "id": "eachCustomer",
@@ -890,7 +1045,7 @@
           }
         }
       },
-      "uniqueId": "78641ee5-c709-4e14-88a3-aa8a45b97874"
+      "uniqueId": "b5dbe4b0-6820-4faf-b464-c25e00c68745"
     },
     {
       "id": "openCase",
@@ -956,7 +1111,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "cc3ed02f-4de0-45da-9cce-e6780bd2ebc9"
+      "uniqueId": "7ae96d81-631b-4f04-8fac-0e6c8c36c8a3"
     },
     {
       "id": "hasOverdueTicket",
@@ -972,7 +1127,7 @@
         "expression": "$vars.eachCustomer.currentItem.overdueTicketId !== \"\""
       },
       "parentId": "eachCustomer",
-      "uniqueId": "d8f17013-f09a-473d-8d39-279fe9b4f02d"
+      "uniqueId": "562d546c-31e3-47d5-8e22-58b667f84e32"
     },
     {
       "id": "escalateTicket",
@@ -1012,7 +1167,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "e48452f7-33fe-481e-91df-a17c4522607a"
+      "uniqueId": "7e098a6a-562c-464f-8943-3d47c30104f4"
     },
     {
       "id": "agentContext",
@@ -1121,7 +1276,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "294fa387-53f9-4e7c-979f-1b8fc356a0ef"
+      "uniqueId": "b17853ea-7d83-4ad1-85dc-4d57811b146d"
     },
     {
       "id": "recommend",
@@ -1132,7 +1287,7 @@
         "icon": "autonomous-agent"
       },
       "inputs": {
-        "systemPrompt": "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin (misalnya 'tidak akan ada gangguan lagi'); jangan memakai kata 'dijamin'. Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. Return a result conforming to the output schema. riskSummary: 1-2 kalimat ringkasan risiko. recommendedAction: langkah retensi yang disarankan untuk tim. offer: satu penawaran sesuai kebijakan, spesifik dan singkat. followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan offer; maksimal 90 kata, tanpa tanda tangan nama orang.",
+        "systemPrompt": "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin (misalnya 'tidak akan ada gangguan lagi'); jangan memakai kata 'dijamin'. Kebijakan penawaran, pilih SATU jenis: 'Diskon' maksimal 30% selama maksimal 3 bulan, ATAU 'Upgrade Kecepatan' gratis selama maksimal 3 bulan, ATAU 'Bulan Gratis' 1 bulan hanya untuk sisa kontrak <= 1 bulan. Kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Return a result conforming to the output schema. riskSummary: 1-2 kalimat ringkasan risiko. recommendedAction: langkah retensi yang disarankan untuk tim. offerType: tepat salah satu dari 'Diskon', 'Upgrade Kecepatan', 'Bulan Gratis'. discountPercent: persen diskon bila offerType 'Diskon', selain itu 0. durationMonths: lama penawaran dalam bulan. technicianVisit: true bila menambahkan kunjungan teknisi prioritas. followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan penawaran itu dengan angka yang sama persis; jangan menyebut angka persen lain (misalnya packet loss); maksimal 90 kata, tanpa tanda tangan nama orang.",
         "userPrompt": "Nama: {{ $vars.agentContext.output.name }}\nPaket: {{ $vars.agentContext.output.plan }} (Rp {{ $vars.agentContext.output.fee }}/bulan)\nKota: {{ $vars.agentContext.output.city }}\nLama berlangganan: {{ $vars.agentContext.output.tenure }} bulan, sisa kontrak: {{ $vars.agentContext.output.contractLeft }} bulan\nGangguan 30 hari: {{ $vars.agentContext.output.outages }}, packet loss: {{ $vars.agentContext.output.packetLoss }}%, latency: {{ $vars.agentContext.output.latency }} ms\nKeluhan 30 hari: {{ $vars.agentContext.output.complaints }}, keluhan terakhir: {{ $vars.agentContext.output.lastComplaint }}\nTiket lewat SLA: {{ $vars.agentContext.output.ticket }}\nSkor churn: {{ $vars.agentContext.output.score }} ({{ $vars.agentContext.output.level }})\nAlasan: {{ $vars.agentContext.output.reasons }}",
         "model": "anthropic.claude-sonnet-5",
         "mode": "standard",
@@ -1229,8 +1384,20 @@
             "type": "string"
           },
           {
-            "id": "offer",
+            "id": "offerType",
             "type": "string"
+          },
+          {
+            "id": "discountPercent",
+            "type": "number"
+          },
+          {
+            "id": "durationMonths",
+            "type": "number"
+          },
+          {
+            "id": "technicianVisit",
+            "type": "boolean"
           },
           {
             "id": "followUpMessage",
@@ -1238,7 +1405,8 @@
           }
         ],
         "source": "dde85ea2-ea1d-4750-9be2-225eb24a7110",
-        "modelSkipsTemperature": true
+        "modelSkipsTemperature": true,
+        "errorHandlingEnabled": true
       },
       "outputs": {
         "error": {
@@ -1283,7 +1451,47 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "27f5ee3d-49a0-4383-a4c0-50617154d25b"
+      "uniqueId": "573bdfbf-4908-4cea-91c3-95c0abb84e2b"
+    },
+    {
+      "id": "aiFailedCase",
+      "type": "core.datafabric.update",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "aiFailedCase",
+        "icon": "layers-arrow-up-right"
+      },
+      "inputs": {
+        "entityConfig": {
+          "entityName": "CsRetentionCase",
+          "recordSource": "byId",
+          "recordId": "=js:$vars.openCase.output.Id",
+          "fieldUpdates": [
+            {
+              "field": "CaseStatus",
+              "value": "Needs Manual Review"
+            },
+            {
+              "field": "Decision",
+              "value": "AI Failed"
+            },
+            {
+              "field": "ReviewerNote",
+              "value": "=js:\"Rekomendasi AI gagal: \" + ($vars.recommend.error.message || \"tidak diketahui\") + \". Tangani manual.\""
+            }
+          ]
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "jsonSchema",
+          "description": "Entity record after the update",
+          "source": "=response",
+          "var": "output"
+        }
+      },
+      "parentId": "eachCustomer",
+      "uniqueId": "302027b1-a828-4460-a269-dde3d2b6dfdc"
     },
     {
       "id": "policyCheck",
@@ -1294,7 +1502,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n  function checkPolicy(offer, message, contractLeft) {\n    const o = String(offer || \"\").toLowerCase();\n    const m = String(message || \"\").toLowerCase();\n    const issues = [];\n    if (o.trim() === \"\") issues.push(\"penawaran kosong\");\n    const pct = (o.match(/[0-9]+ *%/g) || []).map((x) => parseInt(x, 10));\n    pct.forEach((p) => { if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\"); });\n    const months = (o.match(/[0-9]+ *bulan/g) || []).map((x) => parseInt(x, 10));\n    months.forEach((n) => { if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\"); });\n    let hasDiscount = false, hasUpgrade = false, hasFreeMonth = false;\n    o.split(/[+;]| dan | serta |disertai|ditambah|plus /).forEach((part) => {\n      if (part.indexOf(\"upgrade\") >= 0 || part.indexOf(\"kecepatan\") >= 0) { hasUpgrade = true; return; }\n      if (part.indexOf(\"%\") >= 0 || part.indexOf(\"diskon\") >= 0 || part.indexOf(\"potongan\") >= 0) hasDiscount = true;\n      const free = part.match(/gratis *([0-9]+) *bulan|([0-9]+) *bulan *gratis|free *([0-9]+) *month/);\n      if (free) {\n        hasFreeMonth = true;\n        const n = parseInt(free[1] || free[2] || free[3], 10);\n        if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n        if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n      }\n    });\n    if ([hasDiscount, hasUpgrade, hasFreeMonth].filter(Boolean).length > 1) issues.push(\"menggabungkan lebih dari satu jenis penawaran\");\n    const banned = [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"];\n    banned.forEach((w) => { if (o.indexOf(w) >= 0 || m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\"); });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\" };\n  }\n\n          return checkPolicy($vars.recommend.output.offer, $vars.recommend.output.followUpMessage,\n            $vars.eachCustomer.currentItem.contractMonthsLeft);\n        "
+        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n\n          const r = $vars.recommend.output;\n          return checkPolicy(r.offerType, r.discountPercent, r.durationMonths, r.technicianVisit, r.followUpMessage,\n            $vars.eachCustomer.currentItem.contractMonthsLeft);\n        "
       },
       "outputs": {
         "output": {
@@ -1307,6 +1515,9 @@
               "type": "string"
             },
             "issues": {
+              "type": "string"
+            },
+            "offer": {
               "type": "string"
             }
           }
@@ -1353,7 +1564,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "bb1b21dc-18cf-49c2-a010-5b9717afabbc"
+      "uniqueId": "2029e602-ce20-4f49-8ac6-614c61146114"
     },
     {
       "id": "markPending",
@@ -1379,7 +1590,23 @@
             },
             {
               "field": "OfferDetail",
-              "value": "=js:$vars.recommend.output.offer"
+              "value": "=js:$vars.policyCheck.output.offer"
+            },
+            {
+              "field": "OfferType",
+              "value": "=js:$vars.recommend.output.offerType"
+            },
+            {
+              "field": "DiscountPercent",
+              "value": "=js:$vars.recommend.output.discountPercent"
+            },
+            {
+              "field": "OfferMonths",
+              "value": "=js:$vars.recommend.output.durationMonths"
+            },
+            {
+              "field": "TechnicianVisit",
+              "value": "=js:$vars.recommend.output.technicianVisit"
             },
             {
               "field": "FollowUpMessage",
@@ -1409,7 +1636,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "9ad98d59-6db7-452c-b339-7d2633df15fd"
+      "uniqueId": "ab18489e-7162-4147-916d-e2bd889019da"
     },
     {
       "id": "retentionReview",
@@ -1486,6 +1713,13 @@
               "binding": "vars.recommend.output.recommendedAction"
             },
             {
+              "id": "aiDraft",
+              "label": "Draf penawaran AI",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.policyCheck.output.offer"
+            },
+            {
               "id": "policyResult",
               "label": "Cek kebijakan draf AI",
               "type": "string",
@@ -1493,11 +1727,49 @@
               "binding": "=js:$vars.policyCheck.output.status + \" - \" + $vars.policyCheck.output.issues"
             },
             {
-              "id": "offer",
-              "label": "Penawaran (boleh diedit)",
-              "type": "string",
+              "id": "offerType",
+              "label": "Jenis penawaran (boleh diubah)",
+              "type": "singleSelect",
               "direction": "inOut",
-              "binding": "vars.recommend.output.offer"
+              "binding": "vars.recommend.output.offerType",
+              "options": [
+                {
+                  "id": "offer-discount",
+                  "value": "Diskon",
+                  "label": "Diskon"
+                },
+                {
+                  "id": "offer-upgrade",
+                  "value": "Upgrade Kecepatan",
+                  "label": "Upgrade Kecepatan"
+                },
+                {
+                  "id": "offer-free",
+                  "value": "Bulan Gratis",
+                  "label": "Bulan Gratis"
+                }
+              ]
+            },
+            {
+              "id": "discountPercent",
+              "label": "Diskon % (0 bila bukan diskon)",
+              "type": "number",
+              "direction": "inOut",
+              "binding": "vars.recommend.output.discountPercent"
+            },
+            {
+              "id": "offerMonths",
+              "label": "Lama penawaran (bulan)",
+              "type": "number",
+              "direction": "inOut",
+              "binding": "vars.recommend.output.durationMonths"
+            },
+            {
+              "id": "technicianVisit",
+              "label": "Tambah kunjungan teknisi prioritas",
+              "type": "boolean",
+              "direction": "inOut",
+              "binding": "vars.recommend.output.technicianVisit"
             },
             {
               "id": "followUpMessage",
@@ -1539,8 +1811,17 @@
           "source": "=result",
           "var": "output",
           "properties": {
-            "offer": {
+            "offerType": {
               "type": "string"
+            },
+            "discountPercent": {
+              "type": "number"
+            },
+            "offerMonths": {
+              "type": "number"
+            },
+            "technicianVisit": {
+              "type": "boolean"
             },
             "followUpMessage": {
               "type": "string"
@@ -1611,7 +1892,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "c81eccae-7c3d-4206-aea3-538e18599ba3"
+      "uniqueId": "53ac0dd2-baad-4577-a20b-af0234e40580"
     },
     {
       "id": "recheckPolicy",
@@ -1622,7 +1903,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n  function checkPolicy(offer, message, contractLeft) {\n    const o = String(offer || \"\").toLowerCase();\n    const m = String(message || \"\").toLowerCase();\n    const issues = [];\n    if (o.trim() === \"\") issues.push(\"penawaran kosong\");\n    const pct = (o.match(/[0-9]+ *%/g) || []).map((x) => parseInt(x, 10));\n    pct.forEach((p) => { if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\"); });\n    const months = (o.match(/[0-9]+ *bulan/g) || []).map((x) => parseInt(x, 10));\n    months.forEach((n) => { if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\"); });\n    let hasDiscount = false, hasUpgrade = false, hasFreeMonth = false;\n    o.split(/[+;]| dan | serta |disertai|ditambah|plus /).forEach((part) => {\n      if (part.indexOf(\"upgrade\") >= 0 || part.indexOf(\"kecepatan\") >= 0) { hasUpgrade = true; return; }\n      if (part.indexOf(\"%\") >= 0 || part.indexOf(\"diskon\") >= 0 || part.indexOf(\"potongan\") >= 0) hasDiscount = true;\n      const free = part.match(/gratis *([0-9]+) *bulan|([0-9]+) *bulan *gratis|free *([0-9]+) *month/);\n      if (free) {\n        hasFreeMonth = true;\n        const n = parseInt(free[1] || free[2] || free[3], 10);\n        if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n        if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n      }\n    });\n    if ([hasDiscount, hasUpgrade, hasFreeMonth].filter(Boolean).length > 1) issues.push(\"menggabungkan lebih dari satu jenis penawaran\");\n    const banned = [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"];\n    banned.forEach((w) => { if (o.indexOf(w) >= 0 || m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\"); });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\" };\n  }\n\n                  return checkPolicy($vars.retentionReview.output.offer, $vars.retentionReview.output.followUpMessage,\n                    $vars.eachCustomer.currentItem.contractMonthsLeft);\n                "
+        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n\n                  const r = $vars.retentionReview.output;\n                  return checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage,\n                    $vars.eachCustomer.currentItem.contractMonthsLeft);\n                "
       },
       "outputs": {
         "output": {
@@ -1635,6 +1916,9 @@
               "type": "string"
             },
             "issues": {
+              "type": "string"
+            },
+            "offer": {
               "type": "string"
             }
           }
@@ -1681,7 +1965,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "ba296f10-301b-46cd-88c1-15d1e268ea3e"
+      "uniqueId": "acf24199-5231-47f1-a085-fe341e61b77b"
     },
     {
       "id": "offerWithinPolicy",
@@ -1697,7 +1981,7 @@
         "expression": "$vars.recheckPolicy.output.status === \"Compliant\""
       },
       "parentId": "eachCustomer",
-      "uniqueId": "27dce5fa-fc23-47e3-be2f-4c9a9fe6e780"
+      "uniqueId": "8358ea0f-efa3-44cb-900b-a28dc9e28c55"
     },
     {
       "id": "approveCase",
@@ -1723,7 +2007,23 @@
             },
             {
               "field": "OfferDetail",
-              "value": "=js:$vars.retentionReview.output.offer"
+              "value": "=js:$vars.recheckPolicy.output.offer"
+            },
+            {
+              "field": "OfferType",
+              "value": "=js:$vars.retentionReview.output.offerType"
+            },
+            {
+              "field": "DiscountPercent",
+              "value": "=js:$vars.retentionReview.output.discountPercent"
+            },
+            {
+              "field": "OfferMonths",
+              "value": "=js:$vars.retentionReview.output.offerMonths"
+            },
+            {
+              "field": "TechnicianVisit",
+              "value": "=js:$vars.retentionReview.output.technicianVisit"
             },
             {
               "field": "FollowUpMessage",
@@ -1753,7 +2053,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "82338691-7140-4b88-a9fd-b1db9535b89e"
+      "uniqueId": "ec48e6b3-887c-4ca5-b05f-7570bad7263c"
     },
     {
       "id": "supervisorReview",
@@ -1799,7 +2099,14 @@
               "label": "Penawaran yang disetujui reviewer",
               "type": "string",
               "direction": "input",
-              "binding": "vars.retentionReview.output.offer"
+              "binding": "vars.recheckPolicy.output.offer"
+            },
+            {
+              "id": "svMessage",
+              "label": "Pesan follow-up",
+              "type": "string",
+              "direction": "input",
+              "binding": "vars.retentionReview.output.followUpMessage"
             },
             {
               "id": "svIssues",
@@ -1914,7 +2221,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "782d05b1-ac26-4fc2-a2e9-0fd29a33b60a"
+      "uniqueId": "d6803627-6577-4bd0-bd23-88716a0b32c9"
     },
     {
       "id": "approveException",
@@ -1940,7 +2247,23 @@
             },
             {
               "field": "OfferDetail",
-              "value": "=js:$vars.retentionReview.output.offer"
+              "value": "=js:$vars.recheckPolicy.output.offer"
+            },
+            {
+              "field": "OfferType",
+              "value": "=js:$vars.retentionReview.output.offerType"
+            },
+            {
+              "field": "DiscountPercent",
+              "value": "=js:$vars.retentionReview.output.discountPercent"
+            },
+            {
+              "field": "OfferMonths",
+              "value": "=js:$vars.retentionReview.output.offerMonths"
+            },
+            {
+              "field": "TechnicianVisit",
+              "value": "=js:$vars.retentionReview.output.technicianVisit"
             },
             {
               "field": "FollowUpMessage",
@@ -1970,7 +2293,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "99515ce8-b866-4576-970b-f502e978a459"
+      "uniqueId": "7b216a4f-f544-47a3-8786-4bb96e014a4d"
     },
     {
       "id": "rejectOffer",
@@ -1996,7 +2319,23 @@
             },
             {
               "field": "OfferDetail",
-              "value": "=js:$vars.retentionReview.output.offer"
+              "value": "=js:$vars.recheckPolicy.output.offer"
+            },
+            {
+              "field": "OfferType",
+              "value": "=js:$vars.retentionReview.output.offerType"
+            },
+            {
+              "field": "DiscountPercent",
+              "value": "=js:$vars.retentionReview.output.discountPercent"
+            },
+            {
+              "field": "OfferMonths",
+              "value": "=js:$vars.retentionReview.output.offerMonths"
+            },
+            {
+              "field": "TechnicianVisit",
+              "value": "=js:$vars.retentionReview.output.technicianVisit"
             },
             {
               "field": "ReviewerNote",
@@ -2022,7 +2361,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "fec4bf7d-f935-42ce-a7cc-10ca9d3122a4"
+      "uniqueId": "10174a4c-0f0c-4a2b-9a91-51ac37633fde"
     },
     {
       "id": "closeCase",
@@ -2062,7 +2401,7 @@
         }
       },
       "parentId": "eachCustomer",
-      "uniqueId": "95ba2704-e433-45c1-811b-ab0127a92069"
+      "uniqueId": "594335c6-913e-40f6-88b6-4b5bd70a8197"
     },
     {
       "id": "readRunCases",
@@ -2098,7 +2437,7 @@
           "var": "output"
         }
       },
-      "uniqueId": "9b5682b2-b81c-46b0-902b-d70a32c30eac"
+      "uniqueId": "788de815-3dd5-40f0-8517-2331f042cbf3"
     },
     {
       "id": "buildReport",
@@ -2109,7 +2448,7 @@
         "icon": "code"
       },
       "inputs": {
-        "script": "\n      const cases = $vars.readRunCases.output.results || [];\n      const p = $vars.prioritize.output;\n      const approved = cases.filter((c) => c.Decision === \"Approved\" || c.Decision === \"Approved (Exception)\");\n      const exceptions = cases.filter((c) => c.Decision === \"Approved (Exception)\");\n      const rejected = cases.filter((c) => c.Decision === \"Rejected by Supervisor\");\n      const noAction = cases.filter((c) => c.Decision === \"No Action\");\n      const escalated = cases.filter((c) => c.TicketEscalated === true);\n      const aiFlagged = cases.filter((c) => c.PolicyStatus !== \"Compliant\");\n      const protectedRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);\n      const rp = (n) => \"Rp \" + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n      const summary = \"ChurnShield \" + $vars.newRun.output + \": \" + p.scoredCount + \" pelanggan dinilai (\" +\n        $vars.scoringUsed + \"), \" + p.highRiskCount + \" berisiko tinggi dengan revenue at risk \" + rp(p.highRiskRevenue) +\n        \"/tahun. \" + cases.length + \" kasus baru diproses: \" + escalated.length + \" tiket dieskalasi, \" + approved.length +\n        \" penawaran disetujui (\" + rp(protectedRevenue) + \"/tahun dilindungi\" +\n        (exceptions.length ? \", \" + exceptions.length + \" lewat pengecualian supervisor\" : \"\") + \"), \" +\n        (rejected.length ? rejected.length + \" ditolak supervisor, \" : \"\") + noAction.length + \" tanpa tindakan.\" +\n        (p.skipped.length ? \" \" + p.skipped.length + \" pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak.\" : \"\") +\n        (p.overdue.length ? \" \" + p.overdue.length + \" approval lewat SLA \" + $vars.cfgSlaHours + \" jam ditandai untuk supervisor.\" : \"\") +\n        ($vars.scoringNote ? \" Catatan: \" + $vars.scoringNote + \".\" : \"\");\n      return {\n        summary: summary,\n        report: {\n          runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,\n          customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,\n          highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,\n          casesProcessed: cases.length, ticketsEscalated: escalated.length,\n          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,\n          noAction: noAction.length, revenueProtected: protectedRevenue, policyNotCompliantAtClose: aiFlagged.length,\n          skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,\n          cases: cases.map((c) => ({\n            customer: c.CustomerCode + \" \" + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,\n            revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,\n            status: c.CaseStatus, offer: c.OfferDetail, policy: c.PolicyStatus, policyIssues: c.PolicyIssues\n          }))\n        }\n      };\n    "
+        "script": "\n      const cases = $vars.readRunCases.output.results || [];\n      const p = $vars.prioritize.output;\n      const approved = cases.filter((c) => c.Decision === \"Approved\" || c.Decision === \"Approved (Exception)\");\n      const exceptions = cases.filter((c) => c.Decision === \"Approved (Exception)\");\n      const rejected = cases.filter((c) => c.Decision === \"Rejected by Supervisor\");\n      const noAction = cases.filter((c) => c.Decision === \"No Action\");\n      const aiFailed = cases.filter((c) => c.Decision === \"AI Failed\");\n      const escalated = cases.filter((c) => c.TicketEscalated === true);\n      const aiFlagged = cases.filter((c) => c.PolicyStatus !== \"Compliant\" && c.Decision !== \"No Action\" && c.Decision !== \"AI Failed\");\n      // revenue of customers who will receive an approved offer; whether they stay is not tracked yet\n      const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);\n      const rp = (n) => \"Rp \" + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n      const summary = \"ChurnShield \" + $vars.newRun.output + \": \" + p.scoredCount + \" pelanggan dinilai (\" +\n        $vars.scoringUsed + \", keluhan dibaca \" + ($vars.complaintMode === \"ai\" ? \"AI\" : \"kata kunci\") + \"), \" +\n        p.highRiskCount + \" berisiko tinggi dengan revenue at risk \" + rp(p.highRiskRevenue) +\n        \"/tahun. \" + cases.length + \" kasus baru diproses: \" + escalated.length + \" tiket dieskalasi, \" + approved.length +\n        \" penawaran disetujui (\" + rp(offeredRevenue) + \"/tahun ditawari retensi\" +\n        (exceptions.length ? \", \" + exceptions.length + \" lewat pengecualian supervisor\" : \"\") + \"), \" +\n        (rejected.length ? rejected.length + \" ditolak supervisor, \" : \"\") +\n        (aiFailed.length ? aiFailed.length + \" perlu ditangani manual karena AI gagal, \" : \"\") + noAction.length + \" tanpa tindakan.\" +\n        (p.hiddenIntent.length ? \" Peringatan dini: \" + p.hiddenIntent.length + \" pelanggan berskor rendah menyebut niat berhenti di keluhannya.\" : \"\") +\n        (p.skipped.length ? \" \" + p.skipped.length + \" pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak.\" : \"\") +\n        (p.overdue.length ? \" \" + p.overdue.length + \" approval lewat SLA \" + $vars.cfgSlaHours + \" jam ditandai untuk supervisor.\" : \"\") +\n        ($vars.scoringNote ? \" Catatan: \" + $vars.scoringNote + \".\" : \"\") +\n        ($vars.complaintMode !== \"ai\" && $vars.complaintNote ? \" Catatan: \" + $vars.complaintNote + \".\" : \"\");\n      return {\n        summary: summary,\n        report: {\n          runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,\n          complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,\n          customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,\n          highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,\n          casesProcessed: cases.length, ticketsEscalated: escalated.length,\n          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,\n          noAction: noAction.length, aiFailedManualReview: aiFailed.length,\n          revenueOfferedRetention: offeredRevenue,\n          revenueNote: \"revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak\",\n          policyNotCompliantAtClose: aiFlagged.length,\n          earlyWarningIntent: p.hiddenIntent, skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,\n          cases: cases.map((c) => ({\n            customer: c.CustomerCode + \" \" + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,\n            revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,\n            status: c.CaseStatus, offer: c.OfferDetail, policy: c.PolicyStatus, policyIssues: c.PolicyIssues\n          }))\n        }\n      };\n    "
       },
       "outputs": {
         "output": {
@@ -2167,7 +2506,7 @@
           }
         }
       },
-      "uniqueId": "d11a290a-213f-4384-b9e8-07e02d6c5357"
+      "uniqueId": "3efc81d8-f47b-4acd-be48-857af3d18a13"
     },
     {
       "id": "end",
@@ -2338,9 +2677,49 @@
             "fieldType": "string"
           },
           "var": "scoringNote"
+        },
+        "complaintMode": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.complaintMode",
+            "fieldType": "string"
+          },
+          "var": "complaintMode"
+        },
+        "aiNegative": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.aiNegative",
+            "fieldType": "string"
+          },
+          "var": "aiNegative"
+        },
+        "aiIntent": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.aiIntent",
+            "fieldType": "string"
+          },
+          "var": "aiIntent"
+        },
+        "complaintNote": {
+          "type": "string",
+          "description": "",
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.complaintNote",
+            "fieldType": "string"
+          },
+          "var": "complaintNote"
         }
       },
-      "uniqueId": "6f4d2bdd-f43b-4756-a2cb-5e63311a1606"
+      "uniqueId": "3c806cdf-86b6-4603-834c-5c36fd4954ae"
     },
     {
       "id": "dailyRun",
@@ -2355,7 +2734,7 @@
         "timerType": "timeCycle",
         "timerValue": "0 0 7 * * ?"
       },
-      "uniqueId": "0196fcfc-c64a-47ef-aeea-76e957ea776e"
+      "uniqueId": "63822ea4-cff9-426a-a95f-5da794ec4d93"
     }
   ],
   "edges": [
@@ -2419,249 +2798,284 @@
       "id": "edge_8",
       "sourceNodeId": "buildFeatures",
       "sourcePort": "success",
-      "targetNodeId": "scoreRules",
+      "targetNodeId": "analyzeComplaints",
       "targetPort": "input"
     },
     {
       "id": "edge_9",
+      "sourceNodeId": "analyzeComplaints",
+      "sourcePort": "error",
+      "targetNodeId": "complaintFallback",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_10",
+      "sourceNodeId": "analyzeComplaints",
+      "sourcePort": "success",
+      "targetNodeId": "scoreRules",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_11",
       "sourceNodeId": "scoreRules",
       "sourcePort": "success",
       "targetNodeId": "useExternalModel",
       "targetPort": "input"
     },
     {
-      "id": "edge_10",
+      "id": "edge_12",
       "sourceNodeId": "useExternalModel",
       "sourcePort": "true",
       "targetNodeId": "callModel",
       "targetPort": "input"
     },
     {
-      "id": "edge_11",
+      "id": "edge_13",
       "sourceNodeId": "callModel",
       "sourcePort": "error",
       "targetNodeId": "modelFallback",
       "targetPort": "input"
     },
     {
-      "id": "edge_12",
+      "id": "edge_14",
       "sourceNodeId": "callModel",
       "sourcePort": "default",
       "targetNodeId": "mergeModelScores",
       "targetPort": "input"
     },
     {
-      "id": "edge_13",
+      "id": "edge_15",
       "sourceNodeId": "mergeModelScores",
       "sourcePort": "success",
       "targetNodeId": "prioritize",
       "targetPort": "input"
     },
     {
-      "id": "edge_14",
+      "id": "edge_16",
       "sourceNodeId": "useExternalModel",
       "sourcePort": "false",
       "targetNodeId": "prioritize",
       "targetPort": "input"
     },
     {
-      "id": "edge_15",
+      "id": "edge_17",
       "sourceNodeId": "prioritize",
       "sourcePort": "success",
       "targetNodeId": "eachOverdue",
       "targetPort": "input"
     },
     {
-      "id": "edge_16",
+      "id": "edge_18",
       "sourceNodeId": "eachOverdue",
       "sourcePort": "start",
       "targetNodeId": "flagOverdue",
       "targetPort": "input"
     },
     {
-      "id": "edge_17",
+      "id": "edge_19",
       "sourceNodeId": "flagOverdue",
       "sourcePort": "output",
       "targetNodeId": "eachOverdue",
       "targetPort": "continue"
     },
     {
-      "id": "edge_18",
+      "id": "edge_20",
       "sourceNodeId": "eachOverdue",
       "sourcePort": "success",
       "targetNodeId": "eachCustomer",
       "targetPort": "input"
     },
     {
-      "id": "edge_19",
+      "id": "edge_21",
       "sourceNodeId": "eachCustomer",
       "sourcePort": "start",
       "targetNodeId": "openCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_20",
+      "id": "edge_22",
       "sourceNodeId": "openCase",
       "sourcePort": "output",
       "targetNodeId": "hasOverdueTicket",
       "targetPort": "input"
     },
     {
-      "id": "edge_21",
+      "id": "edge_23",
       "sourceNodeId": "hasOverdueTicket",
       "sourcePort": "true",
       "targetNodeId": "escalateTicket",
       "targetPort": "input"
     },
     {
-      "id": "edge_22",
+      "id": "edge_24",
       "sourceNodeId": "escalateTicket",
       "sourcePort": "output",
       "targetNodeId": "agentContext",
       "targetPort": "input"
     },
     {
-      "id": "edge_23",
+      "id": "edge_25",
       "sourceNodeId": "hasOverdueTicket",
       "sourcePort": "false",
       "targetNodeId": "agentContext",
       "targetPort": "input"
     },
     {
-      "id": "edge_24",
+      "id": "edge_26",
       "sourceNodeId": "agentContext",
       "sourcePort": "success",
       "targetNodeId": "recommend",
       "targetPort": "input"
     },
     {
-      "id": "edge_25",
+      "id": "edge_27",
+      "sourceNodeId": "recommend",
+      "sourcePort": "error",
+      "targetNodeId": "aiFailedCase",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_28",
+      "sourceNodeId": "aiFailedCase",
+      "sourcePort": "output",
+      "targetNodeId": "eachCustomer",
+      "targetPort": "continue"
+    },
+    {
+      "id": "edge_29",
       "sourceNodeId": "recommend",
       "sourcePort": "success",
       "targetNodeId": "policyCheck",
       "targetPort": "input"
     },
     {
-      "id": "edge_26",
+      "id": "edge_30",
       "sourceNodeId": "policyCheck",
       "sourcePort": "success",
       "targetNodeId": "markPending",
       "targetPort": "input"
     },
     {
-      "id": "edge_27",
+      "id": "edge_31",
       "sourceNodeId": "markPending",
       "sourcePort": "output",
       "targetNodeId": "retentionReview",
       "targetPort": "input"
     },
     {
-      "id": "edge_28",
+      "id": "edge_32",
       "sourceNodeId": "retentionReview",
       "sourcePort": "outcome-approve-offer",
       "targetNodeId": "recheckPolicy",
       "targetPort": "input"
     },
     {
-      "id": "edge_29",
+      "id": "edge_33",
       "sourceNodeId": "recheckPolicy",
       "sourcePort": "success",
       "targetNodeId": "offerWithinPolicy",
       "targetPort": "input"
     },
     {
-      "id": "edge_30",
+      "id": "edge_34",
       "sourceNodeId": "offerWithinPolicy",
       "sourcePort": "true",
       "targetNodeId": "approveCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_31",
+      "id": "edge_35",
       "sourceNodeId": "offerWithinPolicy",
       "sourcePort": "false",
       "targetNodeId": "supervisorReview",
       "targetPort": "input"
     },
     {
-      "id": "edge_32",
+      "id": "edge_36",
       "sourceNodeId": "supervisorReview",
       "sourcePort": "outcome-approve-exception",
       "targetNodeId": "approveException",
       "targetPort": "input"
     },
     {
-      "id": "edge_33",
+      "id": "edge_37",
       "sourceNodeId": "supervisorReview",
       "sourcePort": "outcome-reject-offer",
       "targetNodeId": "rejectOffer",
       "targetPort": "input"
     },
     {
-      "id": "edge_34",
+      "id": "edge_38",
       "sourceNodeId": "retentionReview",
       "sourcePort": "outcome-no-action",
       "targetNodeId": "closeCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_35",
+      "id": "edge_39",
       "sourceNodeId": "approveCase",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_36",
+      "id": "edge_40",
       "sourceNodeId": "approveException",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_37",
+      "id": "edge_41",
       "sourceNodeId": "rejectOffer",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_38",
+      "id": "edge_42",
       "sourceNodeId": "closeCase",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_39",
+      "id": "edge_43",
       "sourceNodeId": "eachCustomer",
       "sourcePort": "success",
       "targetNodeId": "readRunCases",
       "targetPort": "input"
     },
     {
-      "id": "edge_40",
+      "id": "edge_44",
       "sourceNodeId": "readRunCases",
       "sourcePort": "output",
       "targetNodeId": "buildReport",
       "targetPort": "input"
     },
     {
-      "id": "edge_41",
+      "id": "edge_45",
       "sourceNodeId": "buildReport",
       "sourcePort": "success",
       "targetNodeId": "end",
       "targetPort": "input"
     },
     {
-      "id": "edge_42",
+      "id": "edge_46",
       "sourceNodeId": "dailyRun",
       "sourcePort": "output",
       "targetNodeId": "newRun",
       "targetPort": "input"
     },
     {
-      "id": "edge_43",
+      "id": "edge_47",
+      "sourceNodeId": "complaintFallback",
+      "sourcePort": "success",
+      "targetNodeId": "scoreRules",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_48",
       "sourceNodeId": "modelFallback",
       "sourcePort": "success",
       "targetNodeId": "prioritize",
@@ -3057,6 +3471,438 @@
         "exclude": [
           "api-function"
         ]
+      }
+    },
+    {
+      "nodeType": "uipath.agent.autonomous",
+      "version": "1.4",
+      "category": "agent",
+      "description": "AI agent that completes tasks autonomously",
+      "tags": [
+        "agentic",
+        "ai",
+        "autonomous",
+        "agent"
+      ],
+      "sortOrder": 10,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "Autonomous agent",
+        "icon": "autonomous-agent",
+        "shape": "rectangle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "top",
+          "handles": [
+            {
+              "id": "escalation",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Escalations",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.escalation"
+                  },
+                  {
+                    "nodeType": "uipath.agent.resource.escalation.*"
+                  }
+                ],
+                "validationMessage": "Only Agent Escalation nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": []
+                }
+              }
+            }
+          ]
+        },
+        {
+          "position": "bottom",
+          "handles": [
+            {
+              "id": "context",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Context",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.context.*"
+                  }
+                ],
+                "validationMessage": "Only Context resource nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": [],
+                  "refreshOnFocus": "context",
+                  "createNewActions": [
+                    {
+                      "label": "Create new Context",
+                      "icon": "plus",
+                      "description": "Opens in a new tab",
+                      "urlTemplate": "/{org}/agents_/indexes/add",
+                      "categoryId": "context-grounding-indexes"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "tool",
+              "type": "source",
+              "handleType": "artifact",
+              "label": "Tools",
+              "showButton": true,
+              "constraints": {
+                "allowedTargets": [
+                  {
+                    "nodeType": "uipath.agent.resource.tool.*"
+                  }
+                ],
+                "validationMessage": "Only Tool resource nodes can connect here",
+                "addNodePanel": {
+                  "searchScope": "deep",
+                  "searchProviders": [],
+                  "refreshOnFocus": "mcp",
+                  "createNewActions": [
+                    {
+                      "label": "Create new MCP server",
+                      "icon": "plus",
+                      "urlTemplate": "/{org}/{tenant}/orchestrator_/mcp",
+                      "categoryId": "agent.tool.mcp"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output",
+              "isDefaultForType": true
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        },
+        {
+          "position": "top",
+          "customPositionAndOffsets": {
+            "right": 36,
+            "width": 22
+          },
+          "handles": [
+            {
+              "id": "timeout",
+              "label": "Timeout",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.timeLimitEnabled}",
+              "labelVisibility": "hover"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "form": {
+        "id": "settings-form",
+        "title": "Agent settings",
+        "metadata": {
+          "propertyPanel": {
+            "sectionTabs": {
+              "section-advanced": "advanced"
+            }
+          }
+        },
+        "mode": "onChange",
+        "reValidateMode": "onChange",
+        "sections": [
+          {
+            "id": "section-1",
+            "title": "Agent settings",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.mode",
+                "type": "custom",
+                "component": "agent-harness-picker",
+                "label": ""
+              },
+              {
+                "name": "inputs.model",
+                "type": "custom",
+                "component": "agent-model-picker",
+                "label": "Model",
+                "componentProps": {
+                  "placeholder": "gpt-4o-2024-11-20"
+                }
+              },
+              {
+                "name": "inputs.systemPrompt",
+                "type": "custom",
+                "component": "prompt-editor",
+                "label": "System prompt",
+                "componentProps": {
+                  "multiline": true,
+                  "minRows": 4,
+                  "maxRows": 20,
+                  "placeholder": "Enter the system prompt"
+                }
+              },
+              {
+                "name": "inputs.userPrompt",
+                "type": "custom",
+                "component": "prompt-editor",
+                "label": "User prompt",
+                "componentProps": {
+                  "multiline": true,
+                  "minRows": 3,
+                  "maxRows": 15,
+                  "placeholder": "Enter the user prompt"
+                }
+              }
+            ]
+          },
+          {
+            "id": "section-advanced",
+            "title": "Advanced settings",
+            "collapsible": true,
+            "defaultExpanded": false,
+            "fields": [
+              {
+                "name": "inputs.temperature",
+                "type": "slider",
+                "label": "Temperature",
+                "defaultValue": 0,
+                "min": 0,
+                "max": 1,
+                "step": 0.01
+              },
+              {
+                "name": "inputs.maxTokenPerResponse",
+                "type": "slider",
+                "label": "Maximum tokens per response",
+                "defaultValue": 16384,
+                "min": 0,
+                "step": 1,
+                "maxRef": {
+                  "fromField": "inputs.modelMaxTokens",
+                  "fallback": 16384
+                }
+              },
+              {
+                "name": "inputs.maxIterations",
+                "type": "slider",
+                "label": "Maximum iterations",
+                "defaultValue": 25,
+                "min": 1,
+                "max": 100,
+                "step": 1
+              }
+            ]
+          },
+          {
+            "id": "guardrails",
+            "collapsible": false,
+            "fields": [
+              {
+                "name": "inputs.guardrails",
+                "type": "custom",
+                "component": "guardrails-editor",
+                "label": "",
+                "componentProps": {
+                  "toolName": "Agent",
+                  "scope": "Agent"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "systemPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "System prompt is required"
+            }
+          },
+          "userPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "User prompt is required"
+            }
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": {
+              "minLength": "Model is required"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "advanced"
+            ]
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maxTokenPerResponse": {
+            "type": "number",
+            "minimum": 0
+          },
+          "modelMaxTokens": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxIterations": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "guardrails": {
+            "type": "array"
+          },
+          "agentInputVariables": {
+            "type": "array"
+          },
+          "agentOutputVariables": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "systemPrompt",
+          "userPrompt",
+          "model"
+        ]
+      },
+      "inputDefaults": {
+        "systemPrompt": "You are an agentic assistant.",
+        "userPrompt": "What is the current date?",
+        "model": "gpt-4o-2024-11-20",
+        "mode": "standard",
+        "agentInputVariables": [],
+        "agentOutputVariables": [
+          {
+            "id": "content",
+            "type": "string"
+          }
+        ]
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "Agent response",
+          "var": "output",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The agent response text"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "model": {
+        "source": true,
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Orchestrator.StartInlineAgentJob",
+        "version": "v2",
+        "context": [
+          {
+            "name": "_label",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "entryPoint",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
       }
     },
     {
@@ -4536,438 +5382,6 @@
       }
     },
     {
-      "nodeType": "uipath.agent.autonomous",
-      "version": "1.4",
-      "category": "agent",
-      "description": "AI agent that completes tasks autonomously",
-      "tags": [
-        "agentic",
-        "ai",
-        "autonomous",
-        "agent"
-      ],
-      "sortOrder": 10,
-      "supportsErrorHandling": true,
-      "display": {
-        "label": "Autonomous agent",
-        "icon": "autonomous-agent",
-        "shape": "rectangle"
-      },
-      "handleConfiguration": [
-        {
-          "position": "top",
-          "handles": [
-            {
-              "id": "escalation",
-              "type": "source",
-              "handleType": "artifact",
-              "label": "Escalations",
-              "showButton": true,
-              "constraints": {
-                "allowedTargets": [
-                  {
-                    "nodeType": "uipath.agent.resource.escalation"
-                  },
-                  {
-                    "nodeType": "uipath.agent.resource.escalation.*"
-                  }
-                ],
-                "validationMessage": "Only Agent Escalation nodes can connect here",
-                "addNodePanel": {
-                  "searchScope": "deep",
-                  "searchProviders": []
-                }
-              }
-            }
-          ]
-        },
-        {
-          "position": "bottom",
-          "handles": [
-            {
-              "id": "context",
-              "type": "source",
-              "handleType": "artifact",
-              "label": "Context",
-              "showButton": true,
-              "constraints": {
-                "allowedTargets": [
-                  {
-                    "nodeType": "uipath.agent.resource.context.*"
-                  }
-                ],
-                "validationMessage": "Only Context resource nodes can connect here",
-                "addNodePanel": {
-                  "searchScope": "deep",
-                  "searchProviders": [],
-                  "refreshOnFocus": "context",
-                  "createNewActions": [
-                    {
-                      "label": "Create new Context",
-                      "icon": "plus",
-                      "description": "Opens in a new tab",
-                      "urlTemplate": "/{org}/agents_/indexes/add",
-                      "categoryId": "context-grounding-indexes"
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "id": "tool",
-              "type": "source",
-              "handleType": "artifact",
-              "label": "Tools",
-              "showButton": true,
-              "constraints": {
-                "allowedTargets": [
-                  {
-                    "nodeType": "uipath.agent.resource.tool.*"
-                  }
-                ],
-                "validationMessage": "Only Tool resource nodes can connect here",
-                "addNodePanel": {
-                  "searchScope": "deep",
-                  "searchProviders": [],
-                  "refreshOnFocus": "mcp",
-                  "createNewActions": [
-                    {
-                      "label": "Create new MCP server",
-                      "icon": "plus",
-                      "urlTemplate": "/{org}/{tenant}/orchestrator_/mcp",
-                      "categoryId": "agent.tool.mcp"
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input"
-            }
-          ]
-        },
-        {
-          "position": "right",
-          "handles": [
-            {
-              "id": "success",
-              "type": "source",
-              "handleType": "output",
-              "isDefaultForType": true
-            },
-            {
-              "id": "error",
-              "label": "Error",
-              "type": "source",
-              "handleType": "output",
-              "visible": "{inputs.errorHandlingEnabled}",
-              "constraints": {
-                "maxConnections": 1
-              }
-            }
-          ]
-        },
-        {
-          "position": "top",
-          "customPositionAndOffsets": {
-            "right": 36,
-            "width": 22
-          },
-          "handles": [
-            {
-              "id": "timeout",
-              "label": "Timeout",
-              "type": "source",
-              "handleType": "output",
-              "visible": "{inputs.timeLimitEnabled}",
-              "labelVisibility": "hover"
-            }
-          ],
-          "visible": true
-        }
-      ],
-      "form": {
-        "id": "settings-form",
-        "title": "Agent settings",
-        "metadata": {
-          "propertyPanel": {
-            "sectionTabs": {
-              "section-advanced": "advanced"
-            }
-          }
-        },
-        "mode": "onChange",
-        "reValidateMode": "onChange",
-        "sections": [
-          {
-            "id": "section-1",
-            "title": "Agent settings",
-            "collapsible": true,
-            "defaultExpanded": true,
-            "fields": [
-              {
-                "name": "inputs.mode",
-                "type": "custom",
-                "component": "agent-harness-picker",
-                "label": ""
-              },
-              {
-                "name": "inputs.model",
-                "type": "custom",
-                "component": "agent-model-picker",
-                "label": "Model",
-                "componentProps": {
-                  "placeholder": "gpt-4o-2024-11-20"
-                }
-              },
-              {
-                "name": "inputs.systemPrompt",
-                "type": "custom",
-                "component": "prompt-editor",
-                "label": "System prompt",
-                "componentProps": {
-                  "multiline": true,
-                  "minRows": 4,
-                  "maxRows": 20,
-                  "placeholder": "Enter the system prompt"
-                }
-              },
-              {
-                "name": "inputs.userPrompt",
-                "type": "custom",
-                "component": "prompt-editor",
-                "label": "User prompt",
-                "componentProps": {
-                  "multiline": true,
-                  "minRows": 3,
-                  "maxRows": 15,
-                  "placeholder": "Enter the user prompt"
-                }
-              }
-            ]
-          },
-          {
-            "id": "section-advanced",
-            "title": "Advanced settings",
-            "collapsible": true,
-            "defaultExpanded": false,
-            "fields": [
-              {
-                "name": "inputs.temperature",
-                "type": "slider",
-                "label": "Temperature",
-                "defaultValue": 0,
-                "min": 0,
-                "max": 1,
-                "step": 0.01
-              },
-              {
-                "name": "inputs.maxTokenPerResponse",
-                "type": "slider",
-                "label": "Maximum tokens per response",
-                "defaultValue": 16384,
-                "min": 0,
-                "step": 1,
-                "maxRef": {
-                  "fromField": "inputs.modelMaxTokens",
-                  "fallback": 16384
-                }
-              },
-              {
-                "name": "inputs.maxIterations",
-                "type": "slider",
-                "label": "Maximum iterations",
-                "defaultValue": 25,
-                "min": 1,
-                "max": 100,
-                "step": 1
-              }
-            ]
-          },
-          {
-            "id": "guardrails",
-            "collapsible": false,
-            "fields": [
-              {
-                "name": "inputs.guardrails",
-                "type": "custom",
-                "component": "guardrails-editor",
-                "label": "",
-                "componentProps": {
-                  "toolName": "Agent",
-                  "scope": "Agent"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "inputDefinition": {
-        "type": "object",
-        "properties": {
-          "systemPrompt": {
-            "type": "string",
-            "minLength": 1,
-            "errorMessage": {
-              "minLength": "System prompt is required"
-            }
-          },
-          "userPrompt": {
-            "type": "string",
-            "minLength": 1,
-            "errorMessage": {
-              "minLength": "User prompt is required"
-            }
-          },
-          "model": {
-            "type": "string",
-            "minLength": 1,
-            "errorMessage": {
-              "minLength": "Model is required"
-            }
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "standard",
-              "advanced"
-            ]
-          },
-          "temperature": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "maxTokenPerResponse": {
-            "type": "number",
-            "minimum": 0
-          },
-          "modelMaxTokens": {
-            "type": "number",
-            "minimum": 0
-          },
-          "maxIterations": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 100
-          },
-          "guardrails": {
-            "type": "array"
-          },
-          "agentInputVariables": {
-            "type": "array"
-          },
-          "agentOutputVariables": {
-            "type": "array"
-          }
-        },
-        "required": [
-          "systemPrompt",
-          "userPrompt",
-          "model"
-        ]
-      },
-      "inputDefaults": {
-        "systemPrompt": "You are an agentic assistant.",
-        "userPrompt": "What is the current date?",
-        "model": "gpt-4o-2024-11-20",
-        "mode": "standard",
-        "agentInputVariables": [],
-        "agentOutputVariables": [
-          {
-            "id": "content",
-            "type": "string"
-          }
-        ]
-      },
-      "outputDefinition": {
-        "output": {
-          "type": "object",
-          "description": "Agent response",
-          "var": "output",
-          "properties": {
-            "content": {
-              "type": "string",
-              "description": "The agent response text"
-            }
-          }
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "model": {
-        "source": true,
-        "type": "bpmn:ServiceTask",
-        "serviceType": "Orchestrator.StartInlineAgentJob",
-        "version": "v2",
-        "context": [
-          {
-            "name": "_label",
-            "type": "string",
-            "value": ""
-          },
-          {
-            "name": "name",
-            "type": "string",
-            "value": ""
-          },
-          {
-            "name": "entryPoint",
-            "type": "string",
-            "value": ""
-          }
-        ]
-      },
-      "debug": {
-        "runtime": "bpmnEngine"
-      }
-    },
-    {
       "nodeType": "uipath.human-in-the-loop",
       "version": "1.7",
       "category": "human-task",
@@ -5524,6 +5938,30 @@
         "direction": "inout",
         "type": "string",
         "defaultValue": ""
+      },
+      {
+        "id": "complaintMode",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": "keyword"
+      },
+      {
+        "id": "aiNegative",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": ""
+      },
+      {
+        "id": "aiIntent",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": ""
+      },
+      {
+        "id": "complaintNote",
+        "direction": "inout",
+        "type": "string",
+        "defaultValue": ""
       }
     ],
     "nodes": [
@@ -5664,6 +6102,101 @@
         "description": "Error information if the node fails",
         "binding": {
           "nodeId": "buildFeatures",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "analyzeComplaints.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "analyzeComplaints",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "complaintFallback.output",
+        "type": "string",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "complaintFallback",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "complaintFallback.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "complaintFallback",
           "outputId": "error"
         }
       },
@@ -6224,6 +6757,15 @@
         }
       },
       {
+        "id": "aiFailedCase.output",
+        "type": "jsonSchema",
+        "description": "Entity record after the update",
+        "binding": {
+          "nodeId": "aiFailedCase",
+          "outputId": "output"
+        }
+      },
+      {
         "id": "policyCheck.output",
         "type": "object",
         "description": "The return value of the script",
@@ -6684,6 +7226,47 @@
         }
       },
       {
+        "id": "end.complaintMode",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "complaintMode"
+        }
+      },
+      {
+        "id": "end.aiNegative",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "aiNegative"
+        }
+      },
+      {
+        "id": "end.aiIntent",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "aiIntent"
+        }
+      },
+      {
+        "id": "end.complaintNote",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "complaintNote"
+        }
+      },
+      {
+        "id": "analyzeComplaints.output",
+        "type": "object",
+        "description": "Agent response",
+        "binding": {
+          "nodeId": "analyzeComplaints",
+          "outputId": "output"
+        }
+      },
+      {
         "id": "recommend.output",
         "type": "object",
         "description": "Agent response",
@@ -6694,6 +7277,58 @@
       }
     ],
     "variableUpdates": {
+      "analyzeComplaints": [
+        {
+          "variableId": "complaintMode",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "\"ai\"",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "aiNegative",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.analyzeComplaints.output.negativeCodes",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "aiIntent",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.analyzeComplaints.output.churnIntentCodes",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "complaintNote",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.analyzeComplaints.output.notes",
+            "fieldType": "string"
+          }
+        }
+      ],
+      "complaintFallback": [
+        {
+          "variableId": "complaintNote",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.complaintFallback.output",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "complaintMode",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "\"keyword\"",
+            "fieldType": "string"
+          }
+        }
+      ],
       "scoreRules": [
         {
           "variableId": "scored",
@@ -6926,10 +7561,25 @@
           "y": 128
         }
       },
-      "scoreRules": {
+      "analyzeComplaints": {
         "position": {
           "x": 1216,
           "y": 112
+        },
+        "size": {
+          "width": 288,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1216,
+          "y": 112
+        }
+      },
+      "complaintFallback": {
+        "position": {
+          "x": 1600,
+          "y": 240
         },
         "size": {
           "width": 96,
@@ -6937,14 +7587,29 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1216,
-          "y": 112
+          "x": 1600,
+          "y": 240
+        }
+      },
+      "scoreRules": {
+        "position": {
+          "x": 1792,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1792,
+          "y": 96
         }
       },
       "useExternalModel": {
         "position": {
-          "x": 1408,
-          "y": 96
+          "x": 1984,
+          "y": 80
         },
         "size": {
           "width": 96,
@@ -6952,14 +7617,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1408,
-          "y": 96
+          "x": 1984,
+          "y": 80
         }
       },
       "callModel": {
         "position": {
-          "x": 1600,
-          "y": -48
+          "x": 2176,
+          "y": -64
         },
         "size": {
           "width": 96,
@@ -6967,14 +7632,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1600,
-          "y": -48
+          "x": 2176,
+          "y": -64
         }
       },
       "modelFallback": {
         "position": {
-          "x": 1792,
-          "y": -32
+          "x": 2368,
+          "y": -48
         },
         "size": {
           "width": 96,
@@ -6982,14 +7647,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1792,
-          "y": -32
+          "x": 2368,
+          "y": -48
         }
       },
       "mergeModelScores": {
         "position": {
-          "x": 1792,
-          "y": -224
+          "x": 2368,
+          "y": -240
         },
         "size": {
           "width": 96,
@@ -6997,14 +7662,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1792,
-          "y": -224
+          "x": 2368,
+          "y": -240
         }
       },
       "prioritize": {
         "position": {
-          "x": 1984,
-          "y": -48
+          "x": 2560,
+          "y": -64
         },
         "size": {
           "width": 96,
@@ -7012,14 +7677,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1984,
-          "y": -48
+          "x": 2560,
+          "y": -64
         }
       },
       "eachOverdue": {
         "position": {
-          "x": 2176,
-          "y": -128
+          "x": 2752,
+          "y": -144
         },
         "size": {
           "width": 560,
@@ -7027,8 +7692,8 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2176,
-          "y": -128
+          "x": 2752,
+          "y": -144
         }
       },
       "flagOverdue": {
@@ -7048,8 +7713,8 @@
       },
       "eachCustomer": {
         "position": {
-          "x": 2832,
-          "y": -208
+          "x": 3408,
+          "y": -224
         },
         "size": {
           "width": 2336,
@@ -7057,14 +7722,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2832,
-          "y": -208
+          "x": 3408,
+          "y": -224
         }
       },
       "openCase": {
         "position": {
           "x": 144,
-          "y": 224
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -7073,13 +7738,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 144,
-          "y": 224
+          "y": 160
         }
       },
       "hasOverdueTicket": {
         "position": {
           "x": 304,
-          "y": 224
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -7088,13 +7753,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 304,
-          "y": 224
+          "y": 160
         }
       },
       "escalateTicket": {
         "position": {
           "x": 464,
-          "y": 192
+          "y": 128
         },
         "size": {
           "width": 96,
@@ -7103,13 +7768,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 464,
-          "y": 192
+          "y": 128
         }
       },
       "agentContext": {
         "position": {
           "x": 624,
-          "y": 224
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -7118,13 +7783,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 624,
-          "y": 224
+          "y": 160
         }
       },
       "recommend": {
         "position": {
           "x": 784,
-          "y": 224
+          "y": 160
         },
         "size": {
           "width": 288,
@@ -7133,7 +7798,22 @@
         "collapsed": false,
         "placeholder": {
           "x": 784,
-          "y": 224
+          "y": 160
+        }
+      },
+      "aiFailedCase": {
+        "position": {
+          "x": 1136,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 1136,
+          "y": 96
         }
       },
       "policyCheck": {
@@ -7288,8 +7968,8 @@
       },
       "readRunCases": {
         "position": {
-          "x": 5264,
-          "y": -160
+          "x": 5840,
+          "y": -176
         },
         "size": {
           "width": 96,
@@ -7297,14 +7977,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 5264,
-          "y": -160
+          "x": 5840,
+          "y": -176
         }
       },
       "buildReport": {
         "position": {
-          "x": 5456,
-          "y": -160
+          "x": 6032,
+          "y": -176
         },
         "size": {
           "width": 96,
@@ -7312,14 +7992,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 5456,
-          "y": -160
+          "x": 6032,
+          "y": -176
         }
       },
       "end": {
         "position": {
-          "x": 5648,
-          "y": -176
+          "x": 6224,
+          "y": -192
         },
         "size": {
           "width": 96,
@@ -7327,8 +8007,8 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 5648,
-          "y": -176
+          "x": 6224,
+          "y": -192
         }
       },
       "dailyRun": {

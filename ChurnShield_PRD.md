@@ -47,8 +47,8 @@ ChurnShield runs as a scheduled (daily) or on-demand automation that:
 3. Scores churn risk through the scoring slot (rule-based by default, external ML model when configured).
 4. Prioritizes customers by churn risk and revenue exposure.
 5. Escalates overdue network tickets for prioritized customers automatically.
-6. Generates an AI retention recommendation, offer and follow-up message per customer.
-7. Sends each case to a retention officer for approval, with the option to edit the offer and message.
+6. Generates an AI retention recommendation, structured offer and follow-up message per customer, after an AI reading of all complaints.
+7. Sends each case to a retention officer for approval, with the option to change the offer and message.
 8. Records every decision and status in Data Fabric.
 9. Produces a run report: customers scored, high-risk customers, revenue at risk, tickets escalated, offers approved.
 
@@ -139,10 +139,11 @@ Baseline and target values will be set through prototype testing with synthetic 
 |---|---|---|
 | Data Ingestion | Read customers and open tickets from Data Fabric | Must Have |
 | Feature Builder | Combine network KPIs, complaints, tickets and contract data per customer | Must Have |
+| AI Complaint Analysis | Negative tone and intent to leave from complaint text; early warning; keyword fallback | Must Have |
 | Risk Scoring Slot | Explainable rule-based scoring; optional external ML endpoint with fallback | Must Have |
 | Prioritization | Rank by churn score and revenue at risk; apply threshold and top-N | Must Have |
 | Ticket Escalation | Escalate the most overdue open ticket of each prioritized customer | Must Have |
-| AI Retention Recommendation | Recommended action, offer and follow-up message in Bahasa Indonesia | Must Have |
+| AI Retention Recommendation | Recommended action, structured offer and follow-up message in Bahasa Indonesia; manual review on failure | Must Have |
 | Human Approval | Approve (with optional edits) or decide no action | Must Have |
 | Case Tracking | Retention case record and status in Data Fabric | Must Have |
 | Run Report | Summary of scored customers, high risk, revenue at risk, escalations, approvals | Must Have |
@@ -190,11 +191,18 @@ For each customer the system shall compute:
 - The most overdue open ticket and its hours overdue.
 - Annual revenue at risk (monthly fee × 12).
 
+### FR-02a: AI Complaint Analysis
+
+The system shall send all free-text complaints of a run to an AI agent in one call and receive, per customer, whether the complaint is negative and whether it shows intent to leave (stated, implied or asked about, including slang). These are scoring signals (intent +0.10, negative +0.07) and appear in the reasons.
+
+- Customers whose score is below the threshold but whose complaint shows intent to leave shall be listed in the report as an early warning.
+- If the AI call fails, the system shall use a keyword list instead and record that in the report.
+
 ### FR-03: Risk Scoring Slot
 
 The system shall score churn risk from 0 to 1 per customer and return the top reasons.
 
-- **Rule-based mode (default):** weighted, explainable scoring on outages, packet loss, latency, complaints, negative complaint wording, overdue tickets, contract months left and tenure.
+- **Rule-based mode (default):** weighted, explainable scoring on outages, packet loss, latency, complaints, the AI complaint signal (FR-02a), overdue tickets, contract months left and tenure. The weights are set from domain judgement and are meant to be calibrated by the provider on its own churn history.
 - **External model mode:** send the features to a configured endpoint and use the returned scores.
 - **Fallback:** if the external model fails or is not configured, the system shall use rule-based scores and record that a fallback happened.
 
@@ -224,17 +232,19 @@ For each prioritized customer with an overdue open ticket, the system shall mark
 For each prioritized customer, an AI agent shall produce in Bahasa Indonesia:
 - A short risk summary.
 - A recommended retention action.
-- A proposed offer, within stated policy limits.
-- A follow-up message to the customer that acknowledges the service issue.
+- A proposed offer as structured fields, within stated policy limits: offer type (`Diskon`, `Upgrade Kecepatan`, `Bulan Gratis`), discount percent, duration in months, and whether a priority technician visit is added.
+- A follow-up message to the customer that acknowledges the service issue and states the same offer.
 
-The agent shall use only the provided customer data and shall not promise outcomes that cannot be guaranteed.
+The agent shall use only the provided customer data and shall not promise outcomes that cannot be guaranteed. The offer description shown and stored is generated from the structured fields, not written freely.
+
+If the AI step fails for a customer, the case shall be set to `Needs Manual Review` with the error, and the other customers shall continue.
 
 ### FR-07: Human Approval
 
-The system shall create one approval task per prioritized customer showing customer details, churn score, reasons, revenue at risk, ticket status, the recommended action, and the editable offer and message.
+The system shall create one approval task per prioritized customer showing customer details, churn score, reasons, revenue at risk, ticket status, the recommended action, the AI draft with its policy check, and the editable offer fields and message.
 
 The reviewer shall be able to:
-- Approve the offer, optionally editing the offer and message.
+- Approve the offer, optionally changing the offer type (dropdown), percent, months, technician visit and message.
 - Choose no action.
 - Add a reviewer note.
 
@@ -244,7 +254,7 @@ No follow-up may be sent without approval.
 
 The system shall create a retention case per prioritized customer and update its status through the run.
 
-Statuses: Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed - No Action, Closed - Offer Rejected, Failed.
+Statuses: Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed - No Action, Closed - Offer Rejected, Needs Manual Review.
 
 ### FR-09: Follow-up Delivery
 
@@ -252,22 +262,25 @@ After approval, the system shall prepare the follow-up for delivery. When an ema
 
 ### FR-10: Run Report
 
-At the end of each run, the system shall produce a report with run ID, scoring mode, customers scored, high-risk customers, total revenue at risk, tickets escalated, offers approved, policy exceptions, offers rejected by the supervisor, no-action decisions, customers skipped (with reason), approvals past SLA, and the list of cases.
+At the end of each run, the system shall produce a report with run ID, scoring mode, complaint analysis mode, customers scored, high-risk customers, total revenue at risk, tickets escalated, offers approved, revenue offered retention, policy exceptions, offers rejected by the supervisor, no-action decisions, cases needing manual review, early-warning customers, customers skipped (with reason), approvals past SLA, and the list of cases.
+
+"Revenue offered retention" is the annual revenue of customers with an approved offer. It shall not be presented as revenue saved until the retention outcome is tracked.
 
 ### FR-11: Offer Policy Guardrail
 
-The system shall check every offer against the retention policy with a deterministic rule, both on the AI draft and on the version the reviewer approves:
-- one offer type only (discount, OR speed upgrade, OR free month); a priority technician visit may be added;
-- discount at most 30%, duration at most 3 months;
+The system shall check every offer against the retention policy with a deterministic rule on the structured offer fields, both on the AI draft and on the version the reviewer approves:
+- offer type is one of `Diskon`, `Upgrade Kecepatan`, `Bulan Gratis`; one type only; a priority technician visit may be added;
+- discount at most 30% for at most 3 months; speed upgrade at most 3 months;
 - at most 1 free month, and only when the contract has at most 1 month left;
+- the message must match the offer: no other percentage, no percentage in words, no "setengah harga"-type promise, no other duration, no free month when the offer is a discount;
 - no promise that cannot be guaranteed (for example "dijamin", "bebas gangguan");
-- follow-up message at most 150 words.
+- follow-up message not empty and at most 150 words.
 
 The result of the check on the AI draft shall be shown to the reviewer. If the approved version is out of policy, the system shall not mark it ready; it shall create a supervisor task with the violations, and the supervisor shall either approve an exception (recorded as `Approved (Exception)` with the reason) or reject the offer (`Closed - Offer Rejected`).
 
 ### FR-12: Duplicate Protection and Contact Cooldown
 
-The system shall not create a case for a customer who already has a case in Analyzing, Pending Approval or Follow-up Ready, nor for a customer contacted within the contact cooldown (default 30 days). A supervisor-rejected offer does not start the cooldown, because the customer was not contacted. Skipped customers shall be listed in the run report with the reason.
+The system shall not create a case for a customer who already has a case in Analyzing, Pending Approval, Follow-up Ready or Needs Manual Review, nor for a customer contacted within the contact cooldown (default 30 days). A supervisor-rejected offer does not start the cooldown, because the customer was not contacted. Skipped customers shall be listed in the run report with the reason.
 
 ### FR-13: Approval SLA
 
@@ -282,8 +295,9 @@ Each run shall flag cases that have waited for approval longer than the approval
 | Explainability | Every churn score must come with human-readable reasons. |
 | Human control | No customer contact or offer without explicit approval. |
 | Auditability | Escalations, approvals, edits and reviewer notes must be recorded per case. |
-| Security & Privacy | No credentials in source; prototype uses synthetic data only; customer contact data is visible only to authorized roles. |
-| Reliability | External model failure must fall back to rule-based scoring without stopping the run. |
+| Security & Privacy | No credentials in source; prototype uses synthetic data only; customer contact data is visible only to authorized roles; the AI receives only the fields needed for the offer (no email or phone). |
+| Reliability | External model failure must fall back to rule-based scoring, AI complaint analysis failure to the keyword list, and an AI recommendation failure for one customer to manual review, without stopping the run. |
+| Scalability | The demo runs on 150 customers in one scoring step with reads capped at 1,000 rows. For millions of subscribers, scoring moves to the provider's model or warehouse (external mode) and only the top customers enter the flow. |
 | Configurability | Threshold, top-N, scoring mode, model URL, contact cooldown and approval SLA are configurable without changing the workflow. |
 | Policy compliance | No offer outside the retention policy reaches Follow-up Ready without a recorded supervisor exception. |
 | Idempotency | Repeated or overlapping runs do not create a second open case for the same customer. |
@@ -300,18 +314,19 @@ Each run shall flag cases that have waited for approval longer than the approval
 1. Run starts on schedule (daily) or on demand.
 2. UiPath reads customers, open tickets and existing cases in parallel from Data Fabric.
 3. UiPath builds per-customer features.
-4. UiPath scores churn risk (rules, or external model with fallback).
-5. UiPath prioritizes customers by risk and revenue at risk, skipping customers with an open case or within the contact cooldown.
-6. UiPath flags approvals waiting past the SLA.
-7. For each prioritized customer:
+4. An AI agent reads all complaints (negative tone, intent to leave); keyword list on failure.
+5. UiPath scores churn risk (rules, or external model with fallback) and lists early-warning customers.
+6. UiPath prioritizes customers by risk and revenue at risk, skipping customers with an open case or within the contact cooldown.
+7. UiPath flags approvals waiting past the SLA.
+8. For each prioritized customer:
    1. Create a retention case.
    2. Escalate the most overdue ticket, if any.
-   3. AI agent prepares the recommendation, offer and message.
+   3. AI agent prepares the recommendation, structured offer and message (on failure: Needs Manual Review, next customer).
    4. The policy guardrail checks the AI draft; the result is shown to the reviewer.
    5. Retention officer approves (with edits) or chooses no action.
    6. The approved version is checked again; an out-of-policy offer goes to a supervisor (exception or reject).
    7. Case is updated; approved follow-ups are prepared or sent.
-8. UiPath produces the run report.
+9. UiPath produces the run report.
 
 ### 7.2 Exception Handling
 
@@ -326,6 +341,8 @@ Each run shall flag cases that have waited for approval longer than the approval
 | AI draft or reviewer edit outside the offer policy | Show the violations; require a supervisor exception or reject the offer |
 | Customer already has an open case or was recently contacted | Skip the customer and list the reason in the report |
 | Approval not given within the SLA | Flag the case (`ApprovalOverdue`) and list it in the report |
+| AI complaint analysis fails | Use the keyword list; note it in the report |
+| AI recommendation fails for a customer | Case `Needs Manual Review` with the error; other customers continue |
 
 ---
 
@@ -338,7 +355,8 @@ Each run shall flag cases that have waited for approval longer than the approval
 - **UiPath Integration Service:** email delivery (Gmail connector) for escalations, follow-ups and reports.
 
 ### AI Services
-- Inline AI agent for retention recommendations and messages.
+- Inline AI agent for complaint analysis (one call per run).
+- Inline AI agent for retention recommendations, structured offers and messages.
 - Optional external ML churn model through HTTP.
 
 ### Data Model (MVP)
@@ -347,7 +365,7 @@ Each run shall flag cases that have waited for approval longer than the approval
 |---|---|
 | CsCustomer | CustomerCode, CustomerName, ServicePlan, MonthlyFee, TenureMonths, ContractMonthsLeft, City, ContactEmail, Outages30d, AvgPacketLoss, AvgLatencyMs, Complaints30d, LastComplaint |
 | CsTicket | TicketCode, CustomerCode, Category, Description, OpenedAt, SlaHours, TicketStatus, Escalated, EscalationNote |
-| CsRetentionCase | RunId, CustomerCode, CustomerName, ChurnScore, RiskLevel, TopReasons, RevenueAtRisk, ScoringMode, TicketEscalated, RecommendedAction, OfferDetail, FollowUpMessage, Decision, ReviewerNote, CaseStatus, PolicyStatus, PolicyIssues, ApprovalOverdue |
+| CsRetentionCase | RunId, CustomerCode, CustomerName, ChurnScore, RiskLevel, TopReasons, RevenueAtRisk, ScoringMode, TicketEscalated, RecommendedAction, OfferDetail, OfferType, DiscountPercent, OfferMonths, TechnicianVisit, FollowUpMessage, Decision, ReviewerNote, CaseStatus, PolicyStatus, PolicyIssues, ApprovalOverdue |
 
 ### Configuration
 
@@ -394,6 +412,8 @@ The MVP is successful when:
 10. At least one failure scenario is handled and visible.
 11. Out-of-policy offers cannot reach Follow-up Ready without a supervisor exception.
 12. Overlapping runs do not create duplicate cases.
+13. Complaints are read by AI, with a keyword fallback, and early-warning customers are reported.
+14. An AI failure for one customer does not stop the run.
 
 ---
 
@@ -405,7 +425,9 @@ The MVP is successful when:
 | ML claims not backed by a model | Ship explainable rule scoring; offer an ML slot instead of claiming a model |
 | External model contract mismatch | Document the contract; fall back to rules on error |
 | Email connection not available | Keep follow-ups at Follow-up Ready; do not claim delivery |
-| Over-generous AI offers | Policy limits in the agent prompt; human approval required |
+| Over-generous AI offers | Structured offer fields, deterministic policy check, human approval, supervisor exception |
+| Score weights not calibrated | State it; provider calibrates on its churn history or plugs in its own model |
+| Revenue figures read as savings | Report "revenue offered retention"; track the outcome before claiming savings |
 | Scope expansion | Prioritize MVP modules |
 
 ---

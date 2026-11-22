@@ -145,10 +145,13 @@ The retention officer is the decision-maker for customer contact and offers.
 1. The system scores each customer from 0 to 1.
 2. The system lists the top reasons for the score.
 3. The system shows whether rules or an external model produced the score.
+4. An AI agent reads the complaint text and the reasons say when a complaint is negative or shows intent to leave.
 
 **Acceptance Criteria:**
 - Each prioritized customer has a score, risk level and reasons.
 - The scoring mode is recorded per case.
+- Slang and implied intent ("mending cabut aja", "provider sebelah") are recognised; a neutral question is not counted as negative.
+- If the AI is unavailable, the keyword list is used and the report says so.
 
 ### UR-03: Prioritize by Risk and Revenue
 
@@ -182,12 +185,13 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **Expected System Behavior:**
 1. The AI agent summarizes the risk.
-2. The AI agent proposes an action and an offer within policy.
-3. The AI agent drafts a follow-up message in Bahasa Indonesia that acknowledges the service issue.
+2. The AI agent proposes an action and a structured offer within policy (type, percent, months, technician visit).
+3. The AI agent drafts a follow-up message in Bahasa Indonesia that acknowledges the service issue and states the same offer.
 
 **Acceptance Criteria:**
 - Recommendations use only the customer's data.
 - Messages do not promise outcomes that cannot be guaranteed.
+- If the AI fails for one customer, that case is marked `Needs Manual Review` with the error and the other customers are still processed.
 
 ### UR-06: Approve, Edit or Decline
 
@@ -196,7 +200,7 @@ The retention officer is the decision-maker for customer contact and offers.
 **Expected System Behavior:**
 1. The system creates an approval task per prioritized customer.
 2. The task shows the customer context, score, reasons, revenue at risk, ticket status and recommendation.
-3. The officer can edit the offer and message, add a note, and approve or choose no action.
+3. The officer can change the offer type (dropdown), percent, months, technician visit and message, add a note, and approve or choose no action.
 4. The system records the decision.
 
 **Acceptance Criteria:**
@@ -208,7 +212,7 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **User Requirement:** As a retention manager, I want to see the status of each case so that I know what is pending and what is done.
 
-**Expected System Behavior:** Each case moves through Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent or Closed - No Action, or Failed.
+**Expected System Behavior:** Each case moves through Analyzing, Pending Approval, Follow-up Ready, Follow-up Sent, Closed - No Action, Closed - Offer Rejected, or Needs Manual Review.
 
 **Acceptance Criteria:**
 - Each case has a visible status.
@@ -218,11 +222,12 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **User Requirement:** As a retention manager, I want a report after each run so that I can see the impact.
 
-**Expected System Behavior:** The system reports customers scored, high-risk customers, total revenue at risk, tickets escalated, approvals and no-action decisions.
+**Expected System Behavior:** The system reports customers scored, high-risk customers, total revenue at risk, tickets escalated, approvals, revenue offered retention, no-action decisions, manual-review cases, and early-warning customers (low score, but the complaint shows intent to leave).
 
 **Acceptance Criteria:**
 - The report matches the recorded cases for that run.
-- The report states the scoring mode used and any fallback.
+- The report states the scoring mode and complaint analysis mode used and any fallback.
+- Revenue of approved offers is labelled as offered retention, not as revenue saved.
 
 ### UR-09: Use Our Own Churn Model
 
@@ -253,6 +258,7 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **Acceptance Criteria:**
 - An offer above 30%, longer than 3 months, combining offer types, or with an unjustified free month is flagged.
+- A message that promises more than the offer fields (another percentage, a percentage in words, "setengah harga", another duration, a free month with a discount) is flagged.
 - Promises such as "dijamin" or "bebas gangguan" are flagged.
 - An out-of-policy offer reaches Follow-up Ready only after the supervisor approves an exception, with the reason recorded.
 - A rejected offer closes the case as `Closed - Offer Rejected`.
@@ -289,7 +295,7 @@ The retention officer is the decision-maker for customer contact and offers.
 
 **Step 5 — Tickets escalated.** Overdue tickets of prioritized customers are escalated to the NOC.
 
-**Step 6 — Recommendations prepared.** The AI agent drafts the action, offer and message.
+**Step 6 — Recommendations prepared.** The AI agent drafts the action, a structured offer and the message.
 
 **Step 7 — Officer decides.** The retention officer sees the policy check, edits and approves, or chooses no action.
 
@@ -325,8 +331,8 @@ The retention officer is the decision-maker for customer contact and offers.
 
 | Interface | Description |
 |---|---|
-| Approval task (Action Center) | Customer context, churn score, reasons, revenue at risk, ticket status, recommendation, policy check result, editable offer and message, reviewer note, Approve / No Action |
-| Supervisor task (Action Center) | Customer, revenue at risk, approved offer, policy violations, reviewer note, supervisor reason, Approve Exception / Reject Offer |
+| Approval task (Action Center) | Customer context, churn score, reasons, revenue at risk, ticket status, recommendation, AI draft and its policy check, editable offer type (dropdown) / percent / months / technician visit and message, reviewer note, Approve / No Action |
+| Supervisor task (Action Center) | Customer, revenue at risk, approved offer, message, policy violations, reviewer note, supervisor reason, Approve Exception / Reject Offer |
 | Retention cases (Data Fabric) | List of cases per run with status, decision and notes |
 | Tickets (Data Fabric) | Open and escalated tickets with escalation notes |
 | Run report | Run output and, when email is configured, a summary email |
@@ -375,6 +381,10 @@ The retention officer is the decision-maker for customer contact and offers.
 | UAT-12 | Supervisor rejects an out-of-policy offer | Case `Closed - Offer Rejected`; customer eligible again in the next run |
 | UAT-13 | Second run while the first run's tasks are still open | Those customers skipped with reason; no duplicate case |
 | UAT-14 | Approval waits past the SLA | Case flagged `ApprovalOverdue` and listed in the report |
+| UAT-15 | Complaint "mending cabut aja kalau gini terus" | Reason shows AI intent to leave; neutral "Internet lagi bagus kok, cuma mau tanya ..." is not negative |
+| UAT-16 | Low-score customer asks how to cancel | Listed as early warning in the report |
+| UAT-17 | Officer switches to a discount but keeps a message promising a free month | Re-check flags the message; supervisor task |
+| UAT-18 | AI model unavailable | Keyword fallback noted; case `Needs Manual Review`; run completes |
 
 ---
 

@@ -16,4 +16,8 @@
 {"name":"CaseStatus","type":"STRING"},
 {"name":"PolicyStatus","type":"STRING"},
 {"name":"PolicyIssues","type":"MULTILINE_TEXT","lengthLimit":4000},
-{"name":"ApprovalOverdue","type":"BOOLEAN"}]}
+{"name":"ApprovalOverdue","type":"BOOLEAN"},
+{"name":"OfferType","type":"STRING"},
+{"name":"DiscountPercent","type":"DECIMAL","decimalPrecision":0},
+{"name":"OfferMonths","type":"DECIMAL","decimalPrecision":0},
+{"name":"TechnicianVisit","type":"BOOLEAN"}]}

@@ -13,22 +13,28 @@ Network quality, complaints, tickets and subscription data live in different sys
 at-risk customers late, overdue tickets are not escalated consistently, and nobody follows up after
 an outage is fixed. Retention offers are given without a consistent rule or approval record.
 
+The demo models fixed broadband, but the same signals (network quality, complaints, tickets, contract end)
+exist for a home-broadband brand such as IOH's HiFi and for postpaid mobile; only the data mapping changes.
+
 ## What the robot does
 
 ```
 daily schedule (07:00) or manual run
   -> read customers || read open tickets || read existing cases   (Data Fabric, in parallel)
   -> build features per customer                    (outages, packet loss, latency, complaints, overdue tickets, contract)
-  -> score churn risk                               (scoring slot: rules by default, external ML model optional)
+  -> AI complaint analysis, one call for all complaints (negative tone, intent to leave; keyword fallback)
+  -> score churn risk                               (scoring slot: explainable rules by default, external ML model optional)
   -> prioritize: score x annual revenue at risk     (threshold 0.6, top 5)
        skip customers with an open case or contacted in the last 30 days (no duplicate cases, no spamming)
+       early warning: low-score customers whose complaint shows intent to leave
   -> flag approvals still waiting past the SLA (24 h) for the supervisor
   -> for each prioritized customer, in parallel:
        create retention case
        escalate the most overdue ticket to NOC      (if any)
-       AI agent: risk summary, action, offer, follow-up message (Bahasa Indonesia)
+       AI agent: risk summary, action, STRUCTURED offer (type, %, months, technician visit), follow-up message
+         AI fails -> case set to Needs Manual Review, the other customers continue
        offer policy guardrail on the AI draft       (deterministic check, result shown to the reviewer)
-       human approval in Action Center              (edit offer/message, Approve Offer or No Action)
+       human approval in Action Center              (change offer fields / message, Approve Offer or No Action)
        approved version re-checked against policy
          within policy  -> Follow-up Ready
          out of policy  -> supervisor task: Approve Exception or Reject Offer
@@ -37,26 +43,43 @@ daily schedule (07:00) or manual run
 ```
 
 **Human in the Lead:** no customer is contacted and no offer is given without a person's approval.
-The reviewer can edit the AI's offer and message before approving; the edited version is what gets stored.
-The AI is bounded by policy: neither the AI draft nor a reviewer's edit can go out of policy without a
-supervisor explicitly approving an exception, and every exception is recorded with the reason.
+The reviewer can change the AI's offer (picked from a dropdown, with percent and months as numbers) and
+the message before approving; the edited version is what gets stored. The AI is bounded by policy:
+neither the AI draft nor a reviewer's edit can go out of policy without a supervisor explicitly
+approving an exception, and every exception is recorded with the reason.
+
+## AI complaint analysis
+
+Free-text complaints are read by an AI agent in one call per run (not one call per customer). It marks
+each complaint as negative and/or showing intent to leave, including slang and implied intent
+("mending cabut aja", "provider sebelah", "stop langganan"). The score uses it as one explainable signal
+(intent +0.10, negative +0.07), and the reason names the complaint.
+
+- **Early warning:** customers whose score is still low but who ask about leaving are listed in the report.
+- **Fallback:** if the AI call fails, the keyword list is used and the report says so (tested).
+- On the synthetic data (47 complaints) the AI flagged 6 risky complaints the keyword list missed and did not
+  repeat the keyword list's 5 false alarms ("lagi" contains "lag"). These complaint texts were written by us
+  for the demo, so this shows the behaviour, not a measured accuracy.
 
 ## Offer policy guardrail
 
-The same deterministic check runs on the AI draft and on the reviewer-approved version:
+The offer is structured, so the rules are exact. The same check runs on the AI draft and on the
+reviewer-approved version, and it also checks that the message does not promise more than the offer:
 
 | Rule | Example that is flagged |
 |---|---|
-| One offer type only (discount, OR speed upgrade, OR free month); a priority technician visit may be added | "Diskon 25% + upgrade kecepatan" |
-| Discount at most 30% | "Diskon 50%" |
-| Duration at most 3 months | "selama 6 bulan" |
-| Free month: at most 1, and only when the contract has at most 1 month left | "Gratis 2 bulan", "Gratis 1 bulan" with 6 months left |
+| Offer type is one of `Diskon`, `Upgrade Kecepatan`, `Bulan Gratis`; a priority technician visit may be added | type "Cashback" |
+| One offer type only | upgrade with discount 20% |
+| Discount at most 30%, at most 3 months | discount 50% for 6 months |
+| Speed upgrade at most 3 months | upgrade for 6 months |
+| Free month: at most 1, and only when the contract has at most 1 month left | 2 free months; 1 free month with 6 months left |
+| Message matches the offer | message says "diskon 50%", "lima puluh persen", "setengah harga", "selama 12 bulan", or a free month when the offer is a discount |
 | No promises that cannot be guaranteed | "dijamin", "bebas gangguan", "tidak akan ada gangguan" |
-| Follow-up message at most 150 words | — |
+| Follow-up message not empty, at most 150 words | — |
 
 ## Duplicate protection, contact cooldown and approval SLA
 
-- A customer with a case in `Analyzing`, `Pending Approval` or `Follow-up Ready` is never given a second case.
+- A customer with a case in `Analyzing`, `Pending Approval`, `Follow-up Ready` or `Needs Manual Review` is never given a second case.
 - A customer contacted in the last `contactCooldownDays` (30) is skipped. A supervisor-rejected offer never
   reached the customer, so it does not start the cooldown: the next run prepares a new, compliant offer.
 - Every run flags cases waiting for approval longer than `approvalSlaHours` (24) with `ApprovalOverdue = true`
@@ -89,15 +112,19 @@ POST <externalModelUrl>
 | Capability | Status |
 |---|---|
 | Parallel data ingestion, features, rule scoring, prioritization | Working, tested |
+| AI complaint analysis + early warning, keyword fallback | Working, tested (AI path and forced-failure fallback) |
 | Automatic ticket escalation (Data Fabric) | Working, tested |
-| AI recommendation, offer and message per customer | Working, tested |
-| Parallel human approval tasks with editable offer | Working, tested |
-| Offer policy guardrail + supervisor exception / rejection | Working, tested (AI draft, compliant edit, out-of-policy edit approved as exception, out-of-policy edit rejected) |
+| AI recommendation with structured offer and message per customer | Working, tested |
+| Parallel human approval tasks with editable offer fields | Working, tested |
+| Offer policy guardrail + supervisor exception / rejection | Working, tested (AI draft, compliant edit, out-of-policy edit approved as exception, message that contradicts the offer rejected) |
 | Duplicate protection, contact cooldown, approval SLA flag | Working, tested with overlapping runs |
+| AI failure for one customer | Handled: case set to `Needs Manual Review` with the error, run continues (tested with a deliberately invalid model) |
 | Case tracking and run report | Working, tested |
-| Retention outcome (did the customer stay?) | Not tracked yet; needs the provider's billing/CRM data |
-| AI agent failure handling | Not handled: an error handler on the inline agent is refused by validation in this Flow version. An agent failure is expected to stop the run and leave that case in `Analyzing` (not tested) |
+| Score weights | Set by us from domain judgement, not fitted to churn history. A provider would calibrate them, or plug in its own model |
+| Retention outcome (did the customer stay?) | Not tracked yet; needs the provider's billing/CRM data. The report therefore says "revenue offered retention", not "revenue saved" |
 | External model slot with fallback | Fallback path tested with an unreachable URL; no real model connected |
+| Scale | Tested with 150 customers. Reads are capped at 1,000 rows and all scoring runs in one step, so millions of subscribers need scoring in the provider's model or warehouse (external slot) with only the top customers passed in; not tested at that scale |
+| Customer opt-out / consent | Not implemented; the contact cooldown limits contact frequency. Only fields needed for the offer are sent to the AI (no email or phone) |
 | Daily schedule | Configured (07:00, Quartz cron, platform time zone); fires after deployment |
 | Sending follow-up / escalation / report emails | Not connected yet. Cases stop at `Follow-up Ready`; nothing is claimed as sent |
 
@@ -106,7 +133,7 @@ POST <externalModelUrl>
 - UiPath Maestro Flow (authored with the UiPath VS Code extension and `uip` CLI)
 - UiPath Data Fabric: `CsCustomer`, `CsTicket`, `CsRetentionCase`
 - UiPath Action Center (human approval tasks)
-- Inline AI agent (model `anthropic.claude-sonnet-5`)
+- Inline AI agents (model `anthropic.claude-sonnet-5`): complaint analysis (one call per run) and the retention recommendation (one call per prioritized customer)
 
 ## Setup
 
@@ -123,7 +150,8 @@ POST <externalModelUrl>
 1. Open `ChurnShield.uipx`, project **ChurnShield**, file `ChurnShield/ChurnShield.flow`.
 2. Run / Debug with the inputs in `sample-data/input-sample.json` (all have defaults).
 3. Open Action Center: one **ChurnShield: review retention offer** task per prioritized customer.
-   Check the policy result, edit the offer if needed, then choose **Approve Offer** or **No Action**.
+   Check the policy result, change the offer type / percent / months / technician visit or the message if
+   needed, then choose **Approve Offer** or **No Action**.
    If the approved version is out of policy, a **ChurnShield: penawaran di luar kebijakan** task appears
    for the supervisor: **Approve Exception** or **Reject Offer**.
 4. Check the `CsRetentionCase` and `CsTicket` entities and the run outputs (`summary`, `report`).
@@ -143,7 +171,10 @@ POST <externalModelUrl>
 
 | Scenario | Result |
 |---|---|
-| Default run | 150 customers scored, 21 high risk, Rp 150.6M/year at risk; 5 cases, 5 tickets escalated; 4 approved (one with an edited offer), 1 no action; report matches Data Fabric |
+| Default run (current version) | 150 customers scored, complaints read by AI, 21 high risk, Rp 150.6M/year at risk; 5 cases, 5 tickets escalated; 4 approved (one changed to a 20% discount), 1 no action; Rp 45.6M/year offered retention; 4 low-score customers flagged as early warning |
+| Reviewer sets discount 50% / 6 months | Supervisor task lists 2 violations; Approve Exception stored as `Approved (Exception)` with both notes |
+| Reviewer switches the offer to a discount but keeps a message promising "1 bulan gratis" | Re-check flags the message; supervisor Reject Offer; case `Closed - Offer Rejected` |
+| AI model unavailable (invalid model id) | Complaint analysis falls back to keywords; the customer's case goes to `Needs Manual Review` with the error; run completed |
 | External model URL unreachable | Fallback to rules; report notes the fallback; run completed |
 | Prioritized customer without an overdue ticket | No escalation, case processed normally |
 | Threshold 1.5 | 0 cases; run completed without errors |
@@ -151,6 +182,14 @@ POST <externalModelUrl>
 | Reviewer edits offer to "Gratis 2 bulan + upgrade kecepatan" | Re-check flags 3 violations; supervisor Reject Offer; case `Closed - Offer Rejected` |
 | Second run started while the first run's 5 tasks were still open (SLA 0 h, top 3) | The 5 customers skipped with reason; their 5 cases flagged `ApprovalOverdue`; 3 new customers processed |
 | Run after approvals and closures | 8 customers skipped (open case or cooldown); the supervisor-rejected customer picked again with a new compliant offer |
-| Policy check unit cases | 16 offer/message examples, all classified as expected |
+| Policy check unit cases | 22 structured offer/message examples, all classified as expected |
+
+Earlier builds (free-text offer) were also tested with "Gratis 2 bulan + upgrade kecepatan" (rejected by the supervisor).
+
+## Building the flow
+
+The source is `ChurnShield/.flow-sdk/ChurnShield.flow.ts`. From `ChurnShield/`: `uip maestro flow compile .flow-sdk/ChurnShield.flow.ts -o ChurnShield.flow`,
+then `uip maestro flow format ChurnShield.flow` until `uip maestro flow validate ChurnShield.flow` reports `Valid`
+(the error handlers on the AI agent steps are enabled by `format`, which in our runs needed a second pass).
 
 See `sample-data/output-sample.md` for a full example output.

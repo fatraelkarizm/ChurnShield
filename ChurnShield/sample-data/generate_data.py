@@ -24,6 +24,22 @@ for i in range(1,151):
         age = random.randint(30,96) if (risky and k==0 and random.random()<0.75) else random.randint(1,20)
         cat=random.choice(["Gangguan koneksi","Kecepatan rendah","Perangkat ONT","Instalasi ulang"])
         tix.append(dict(TicketCode=f"TKT-{len(tix)+1:05d}",CustomerCode=code,Category=cat,Description=f"{cat} dilaporkan pelanggan {code}",OpenedAt=(now-datetime.timedelta(hours=age)).isoformat(),SlaHours=sla,TicketStatus="Open",Escalated="false",EscalationNote=""))
+# Phrasing variants, drawn from a separate RNG so every other field stays identical.
+# They mix slang, implicit intent to leave and keyword traps ("lagi" contains "lag"),
+# which is what the AI complaint analysis is for.
+variants={
+ "Internet putus-putus setiap malam, sudah lapor 3 kali belum beres":["Internet putus-putus setiap malam, sudah lapor 3 kali belum beres","Udah seminggu lemot parah tiap malam, mending cabut aja kalau gini terus"],
+ "Kecepatan jauh di bawah paket, kerja dari rumah terganggu":["Kecepatan jauh di bawah paket, kerja dari rumah terganggu","Bayar 100 Mbps dapetnya kayak 10, tetangga pakai provider sebelah lancar-lancar aja"],
+ "Teknisi tidak datang sesuai jadwal, kecewa dengan layanan":["Teknisi tidak datang sesuai jadwal, kecewa dengan layanan","Sudah tiga kali janji teknisi, tidak ada yang datang. Kalau bulan depan masih begini saya stop langganan"],
+ "Sering disconnect saat meeting online, mempertimbangkan pindah provider":["Sering disconnect saat meeting online, mempertimbangkan pindah provider"],
+ "Latency tinggi saat jam sibuk, game dan video call lag":["Latency tinggi saat jam sibuk, game dan video call lag","Sinyal hilang tiap hujan, anak sekolah online jadi ketinggalan pelajaran"],
+ "Tanya cara ganti password WiFi":["Tanya cara ganti password WiFi","Internet lagi bagus kok, cuma mau tanya cara ganti password WiFi"],
+ "Minta info upgrade paket":["Minta info upgrade paket","Terima kasih teknisi kemarin cepat tanggap, mau tanya info upgrade paket"],
+ "Tagihan sudah sesuai, hanya konfirmasi":["Tagihan sudah sesuai, hanya konfirmasi","Mau tanya, kalau berhenti langganan sebelum kontrak habis kena denda berapa?"],
+}
+rv=random.Random(77)
+for c in cust:
+    if c["LastComplaint"] in variants: c["LastComplaint"]=rv.choice(variants[c["LastComplaint"]])
 def w(fn,rows):
     with open(fn,"w",newline="",encoding="utf-8") as f:
         wr=csv.DictWriter(f,fieldnames=list(rows[0].keys())); wr.writeheader(); wr.writerows(rows)

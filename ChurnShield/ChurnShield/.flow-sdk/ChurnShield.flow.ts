@@ -2,17 +2,17 @@
  * ChurnShield Telecom — churn prevention automation for fixed broadband (PRD/URD v1.0)
  *
  * daily schedule / manual run
- *   -> read customers || read open tickets (Data Fabric, parallel)
- *   -> build features -> scoring slot (rules by default; external ML endpoint with fallback)
- *   -> read existing cases (parallel with the above)
+ *   -> read customers || read open tickets || read existing cases (Data Fabric, parallel)
+ *   -> build features -> AI complaint analysis (sentiment + intent to leave; keyword fallback)
+ *   -> scoring slot (explainable rules by default; external ML endpoint with fallback)
  *   -> prioritize by churn score x revenue at risk (threshold, top N),
  *      skipping customers with an open case or contacted within the cooldown
  *   -> flag approvals waiting past the SLA
  *   -> per customer (parallel): open case -> escalate overdue ticket
- *        -> AI retention recommendation -> policy guardrail check
- *        -> human approval (edit / approve / no action)
+ *        -> AI retention recommendation (structured offer) -> policy guardrail check
+ *        -> human approval (edit offer fields and message / approve / no action)
  *        -> approved version re-checked; out-of-policy offers need a supervisor exception
- *        -> case updated
+ *        -> case updated; if the AI step fails the case goes to manual review and the run continues
  *   -> run report from the recorded cases
  *
  * Data is synthetic. No customer is contacted without approval.
@@ -20,44 +20,70 @@
 import {
   flow, scheduled, script, inlineAgent, hitl, http,
   dataFabricRead, dataFabricCreate, dataFabricUpdate,
-  out, v, lit, js, types,
+  out, v, lit, js, err, types,
 } from "@uipath/maestro-builder-sdk";
 
 const MODEL = "anthropic.claude-sonnet-5";
 const item = (field: string) => v(`eachCustomer.currentItem.${field}`);
 
-// FR-11 offer policy guardrail. Deterministic, applied to the AI draft AND to the reviewer's edited version.
+const OFFER_OPTIONS = [
+  { id: "offer-discount", value: "Diskon", label: "Diskon" },
+  { id: "offer-upgrade", value: "Upgrade Kecepatan", label: "Upgrade Kecepatan" },
+  { id: "offer-free", value: "Bulan Gratis", label: "Bulan Gratis" },
+];
+
+// FR-11 offer policy guardrail. The offer is STRUCTURED (type, percent, months, technician visit), so
+// the rules are exact; the follow-up message is checked so it cannot promise more than the offer.
 // Policy: one offer type only — discount <= 30% for <= 3 months, OR free speed upgrade <= 3 months,
 // OR 1 free month only when <= 1 contract month is left; a priority technician visit may be added.
-// No promises that cannot be guaranteed. (Kept free of backslashes so it embeds safely in script code.)
+// (Kept free of backslashes so it embeds safely in script code.)
 const POLICY_FN = `
-  function checkPolicy(offer, message, contractLeft) {
-    const o = String(offer || "").toLowerCase();
-    const m = String(message || "").toLowerCase();
+  function offerText(type, pct, months, visit) {
+    const p = Number(pct || 0), n = Number(months || 0);
+    const t = type === "Diskon" ? "Diskon " + p + "% selama " + n + " bulan"
+      : type === "Upgrade Kecepatan" ? "Upgrade kecepatan gratis selama " + n + " bulan"
+      : type === "Bulan Gratis" ? "Gratis " + n + " bulan langganan"
+      : "Jenis penawaran tidak dikenal (" + type + ")";
+    return (visit === true || visit === "true") ? t + " + kunjungan teknisi prioritas" : t;
+  }
+  function checkPolicy(type, pct, months, visit, message, contractLeft) {
     const issues = [];
-    if (o.trim() === "") issues.push("penawaran kosong");
-    const pct = (o.match(/[0-9]+ *%/g) || []).map((x) => parseInt(x, 10));
-    pct.forEach((p) => { if (p > 30) issues.push("diskon " + p + "% melebihi batas 30%"); });
-    const months = (o.match(/[0-9]+ *bulan/g) || []).map((x) => parseInt(x, 10));
-    months.forEach((n) => { if (n > 3) issues.push("durasi " + n + " bulan melebihi batas 3 bulan"); });
-    let hasDiscount = false, hasUpgrade = false, hasFreeMonth = false;
-    o.split(/[+;]| dan | serta |disertai|ditambah|plus /).forEach((part) => {
-      if (part.indexOf("upgrade") >= 0 || part.indexOf("kecepatan") >= 0) { hasUpgrade = true; return; }
-      if (part.indexOf("%") >= 0 || part.indexOf("diskon") >= 0 || part.indexOf("potongan") >= 0) hasDiscount = true;
-      const free = part.match(/gratis *([0-9]+) *bulan|([0-9]+) *bulan *gratis|free *([0-9]+) *month/);
-      if (free) {
-        hasFreeMonth = true;
-        const n = parseInt(free[1] || free[2] || free[3], 10);
-        if (n > 1) issues.push("gratis " + n + " bulan melebihi batas 1 bulan");
-        if (Number(contractLeft) > 1) issues.push("bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak " + contractLeft + " bulan)");
-      }
+    const p = Number(pct || 0), n = Number(months || 0);
+    if (["Diskon", "Upgrade Kecepatan", "Bulan Gratis"].indexOf(type) < 0) issues.push("jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis");
+    if (n < 1) issues.push("durasi penawaran minimal 1 bulan");
+    if (type === "Diskon") {
+      if (p <= 0) issues.push("persentase diskon belum diisi");
+      if (p > 30) issues.push("diskon " + p + "% melebihi batas 30%");
+      if (n > 3) issues.push("durasi " + n + " bulan melebihi batas 3 bulan");
+    } else if (p > 0) {
+      issues.push("diskon " + p + "% digabung dengan " + type + " (hanya boleh satu jenis penawaran)");
+    }
+    if (type === "Upgrade Kecepatan" && n > 3) issues.push("upgrade " + n + " bulan melebihi batas 3 bulan");
+    if (type === "Bulan Gratis") {
+      if (n > 1) issues.push("gratis " + n + " bulan melebihi batas 1 bulan");
+      if (Number(contractLeft) > 1) issues.push("bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak " + contractLeft + " bulan)");
+    }
+    // the follow-up message must not promise more than the structured offer
+    const m = String(message || "").toLowerCase();
+    if (m.trim() === "") issues.push("pesan follow-up kosong");
+    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {
+      if (type !== "Diskon" || x !== p) issues.push("pesan menyebut " + x + "% yang tidak sama dengan penawaran");
     });
-    if ([hasDiscount, hasUpgrade, hasFreeMonth].filter(Boolean).length > 1) issues.push("menggabungkan lebih dari satu jenis penawaran");
-    const banned = ["dijamin", "tidak akan ada gangguan", "tidak akan terjadi gangguan", "bebas gangguan", "pasti stabil", "100% stabil", "uang kembali"];
-    banned.forEach((w) => { if (o.indexOf(w) >= 0 || m.indexOf(w) >= 0) issues.push("janji yang tidak bisa dijamin: '" + w + "'"); });
+    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push("pesan menyebut potongan tanpa angka yang jelas");
+    ["setengah harga", "separuh harga", "gratis selamanya", "gratis seumur", "selamanya gratis", "harga khusus selamanya"].forEach((w) => {
+      if (m.indexOf(w) >= 0) issues.push("pesan menjanjikan '" + w + "' di luar penawaran");
+    });
+    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace("selama", ""), 10)).forEach((x) => {
+      if (x !== n) issues.push("pesan menyebut durasi " + x + " bulan, penawaran " + n + " bulan");
+    });
+    if (type === "Diskon" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push("pesan menawarkan bulan gratis di luar penawaran");
+    ["dijamin", "tidak akan ada gangguan", "tidak akan terjadi gangguan", "bebas gangguan", "pasti stabil", "100% stabil", "uang kembali"].forEach((w) => {
+      if (m.indexOf(w) >= 0) issues.push("janji yang tidak bisa dijamin: '" + w + "'");
+    });
     const words = m.split(" ").filter((x) => x.trim() !== "").length;
     if (words > 150) issues.push("pesan follow-up terlalu panjang (" + words + " kata, maks 150)");
-    return { status: issues.length ? "Violation" : "Compliant", issues: issues.length ? issues.join("; ") : "sesuai kebijakan" };
+    return { status: issues.length ? "Violation" : "Compliant", issues: issues.length ? issues.join("; ") : "sesuai kebijakan",
+      offer: offerText(type, p, n, visit) };
   }
 `;
 
@@ -92,6 +118,10 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .var("scored", types.array, [])
   .var("scoringUsed", types.string, "rules")
   .var("scoringNote", types.string, "")
+  .var("complaintMode", types.string, "keyword")
+  .var("aiNegative", types.string, "")
+  .var("aiIntent", types.string, "")
+  .var("complaintNote", types.string, "")
 
   .step("newRun", script({
     code: `
@@ -103,7 +133,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     returns: "string",
   }))
 
-  // FR-01 ingestion: customers and open tickets are independent reads
+  // FR-01 ingestion: customers, open tickets and existing cases are independent reads
   .parallel("ingest", [
     (a) => a.step("readCustomers", dataFabricRead({
       entity: "CsCustomer", resultMode: "multiple", limit: 1000,
@@ -152,15 +182,56 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           revenueAtRisk: Number(c.MonthlyFee || 0) * 12
         };
       });
-      return { features: features, customerCount: features.length, openTicketCount: tickets.length };
+      const complaintLines = features.filter((f) => String(f.lastComplaint).trim() !== "")
+        .map((f) => f.customerCode + " | " + f.lastComplaint).join("\\n");
+      return { features: features, customerCount: features.length, openTicketCount: tickets.length,
+        complaintLines: complaintLines };
     `,
-    returns: { features: "array", customerCount: "number", openTicketCount: "number" },
+    returns: { features: "array", customerCount: "number", openTicketCount: "number", complaintLines: "string" },
   }))
+
+  // FR-02a AI complaint analysis: reads the free-text complaints in one call (sentiment and intent to leave).
+  // If the AI is unavailable the score falls back to the keyword list, and the report says so.
+  .step("analyzeComplaints", inlineAgent({
+    model: MODEL,
+    systemPrompt:
+      "Kamu menganalisis keluhan pelanggan ISP di Indonesia, termasuk bahasa gaul dan sindiran. " +
+      "Setiap baris berformat 'KODE | teks keluhan'. Nilai setiap keluhan HANYA dari teksnya. " +
+      "Negatif: pelanggan kesal, kecewa, atau mengeluhkan layanan (bukan sekadar bertanya). " +
+      "Niat berhenti: pelanggan menyebut, menyiratkan, atau menanyakan berhenti langganan, pindah provider, " +
+      "membandingkan dengan provider lain, atau mengancam berhenti (misalnya 'cabut', 'stop langganan', 'provider sebelah'). " +
+      "Pertanyaan biasa atau ucapan terima kasih bukan negatif. Kata 'lagi' bukan 'lag'. " +
+      "Return a result conforming to the output schema. " +
+      "negativeCodes: kode pelanggan yang keluhannya negatif, dipisah koma, kosong bila tidak ada. " +
+      "churnIntentCodes: kode pelanggan yang menunjukkan niat berhenti (negatif atau tidak), dipisah koma, kosong bila tidak ada. " +
+      "notes: 1-2 kalimat pola utama keluhan.",
+    userPrompt: "Keluhan pelanggan:\n{{input.complaints}}",
+    inputs: { complaints: out("buildFeatures", "complaintLines") },
+    returns: { negativeCodes: "string", churnIntentCodes: "string", notes: "string" },
+  }), {
+    updates: {
+      complaintMode: lit("ai"),
+      aiNegative: out("analyzeComplaints", "negativeCodes"),
+      aiIntent: out("analyzeComplaints", "churnIntentCodes"),
+      complaintNote: out("analyzeComplaints", "notes"),
+    },
+  })
+  .onError((h) =>
+    h
+      .step("complaintFallback", script({
+        code: `return "Analisis keluhan AI gagal; sinyal keluhan memakai daftar kata kunci";`,
+        returns: "string",
+      }), { updates: { complaintNote: out("complaintFallback"), complaintMode: lit("keyword") } })
+      .stepToRef("scoreRules"),
+  )
 
   // FR-03 scoring slot, default implementation: explainable rule-based score
   .step("scoreRules", script({
     code: `
       const negative = ["pindah provider", "kecewa", "putus", "berhenti", "lag", "terganggu"];
+      const codes = (s) => String(s || "").split(",").map((x) => x.trim().toUpperCase()).filter((x) => x !== "");
+      const aiMode = $vars.complaintMode === "ai";
+      const aiNeg = codes($vars.aiNegative), aiIntent = codes($vars.aiIntent);
       const scored = $vars.buildFeatures.output.features.map((f) => {
         const reasons = [];
         let s = 0;
@@ -169,8 +240,15 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         add(Math.min(f.avgPacketLoss / 5, 1) * 0.15 * (f.avgPacketLoss >= 2 ? 1 : 0), "packet loss rata-rata " + f.avgPacketLoss + "%");
         add(Math.min(Math.max(f.avgLatencyMs - 60, 0) / 150, 1) * 0.10, "latency rata-rata " + f.avgLatencyMs + " ms");
         add(Math.min(f.complaints30d / 4, 1) * 0.15 * (f.complaints30d >= 2 ? 1 : 0), f.complaints30d + " keluhan dalam 30 hari");
-        const text = String(f.lastComplaint).toLowerCase();
-        if (negative.some((w) => text.indexOf(w) >= 0)) add(0.10, "keluhan bernada negatif: \\"" + f.lastComplaint + "\\"");
+        let intent = false;
+        if (aiMode) {
+          intent = aiIntent.indexOf(f.customerCode) >= 0;
+          if (intent) add(0.10, "AI: keluhan menunjukkan niat berhenti: \\"" + f.lastComplaint + "\\"");
+          else if (aiNeg.indexOf(f.customerCode) >= 0) add(0.07, "AI: keluhan bernada negatif: \\"" + f.lastComplaint + "\\"");
+        } else {
+          const text = String(f.lastComplaint).toLowerCase();
+          if (negative.some((w) => text.indexOf(w) >= 0)) add(0.10, "keluhan bernada negatif (kata kunci): \\"" + f.lastComplaint + "\\"");
+        }
         if (f.overdueTickets > 0) add(0.15, "tiket " + f.overdueTicketCode + " lewat SLA " + f.hoursOverdue + " jam");
         if (f.contractMonthsLeft <= 0) add(0.10, "kontrak sudah habis bulan ini");
         else if (f.contractMonthsLeft <= 1) add(0.10, "kontrak habis dalam 1 bulan");
@@ -178,7 +256,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         if (f.tenureMonths < 6) add(0.05, "pelanggan baru (" + f.tenureMonths + " bulan)");
         const score = Math.round(Math.min(s, 1) * 100) / 100;
         return Object.assign({}, f, {
-          churnScore: score,
+          churnScore: score, churnIntent: intent,
           riskLevel: score >= 0.75 ? "Very High" : score >= 0.6 ? "High" : score >= 0.35 ? "Medium" : "Low",
           reasons: reasons.length ? reasons.join("; ") : "tidak ada sinyal risiko signifikan"
         });
@@ -245,7 +323,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const now = Date.now();
       const cooldownMs = Math.max(0, Number($vars.cfgCooldownDays)) * 86400000;
       const slaMs = Math.max(0, Number($vars.cfgSlaHours)) * 3600000;
-      const openStatuses = ["Analyzing", "Pending Approval", "Follow-up Ready"];
+      const openStatuses = ["Analyzing", "Pending Approval", "Follow-up Ready", "Needs Manual Review"];
       const cases = $vars.readCases.output.results || [];
       const blocked = {};
       const overdue = [];
@@ -267,10 +345,13 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const skipped = high.filter((r) => blocked[r.customerCode]).map((r) => ({ customer: r.customerCode + " " + r.customerName, reason: blocked[r.customerCode] }));
       const top = eligible.slice(0, topN);
       const total = high.reduce((s, r) => s + r.revenueAtRisk, 0);
+      // early warning: the score is still low, but the AI read an intent to leave in the complaint
+      const hiddenIntent = $vars.scored.filter((r) => r.churnIntent && r.churnScore < threshold)
+        .map((r) => ({ customer: r.customerCode + " " + r.customerName, churnScore: r.churnScore, complaint: r.lastComplaint }));
       return { top: top, highRiskCount: high.length, highRiskRevenue: total, scoredCount: $vars.scored.length,
-        skipped: skipped, overdue: overdue };
+        skipped: skipped, overdue: overdue, hiddenIntent: hiddenIntent };
     `,
-    returns: { top: "array", highRiskCount: "number", highRiskRevenue: "number", scoredCount: "number", skipped: "array", overdue: "array" },
+    returns: { top: "array", highRiskCount: "number", highRiskRevenue: "number", scoredCount: "number", skipped: "array", overdue: "array", hiddenIntent: "array" },
   }))
 
   // FR-13 approval SLA: cases still waiting for a reviewer past the SLA are flagged for the supervisor
@@ -346,15 +427,20 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         systemPrompt:
           "Kamu adalah analis retensi pelanggan ISP fixed broadband di Indonesia. " +
           "Gunakan HANYA data pelanggan yang diberikan. Jangan menjanjikan hal yang tidak bisa dijamin " +
-          "(misalnya 'tidak akan ada gangguan lagi'); jangan memakai kata 'dijamin'. Kebijakan penawaran: maksimal diskon 30% selama 3 bulan, " +
-          "ATAU upgrade kecepatan gratis 3 bulan, ATAU 1 bulan gratis untuk pelanggan dengan kontrak <= 1 bulan; " +
-          "kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. Pilih satu penawaran yang paling sesuai. " +
+          "(misalnya 'tidak akan ada gangguan lagi'); jangan memakai kata 'dijamin'. " +
+          "Kebijakan penawaran, pilih SATU jenis: 'Diskon' maksimal 30% selama maksimal 3 bulan, " +
+          "ATAU 'Upgrade Kecepatan' gratis selama maksimal 3 bulan, ATAU 'Bulan Gratis' 1 bulan hanya untuk sisa kontrak <= 1 bulan. " +
+          "Kunjungan teknisi prioritas boleh ditambahkan bila ada gangguan jaringan. " +
           "Return a result conforming to the output schema. " +
           "riskSummary: 1-2 kalimat ringkasan risiko. " +
           "recommendedAction: langkah retensi yang disarankan untuk tim. " +
-          "offer: satu penawaran sesuai kebijakan, spesifik dan singkat. " +
+          "offerType: tepat salah satu dari 'Diskon', 'Upgrade Kecepatan', 'Bulan Gratis'. " +
+          "discountPercent: persen diskon bila offerType 'Diskon', selain itu 0. " +
+          "durationMonths: lama penawaran dalam bulan. " +
+          "technicianVisit: true bila menambahkan kunjungan teknisi prioritas. " +
           "followUpMessage: pesan follow-up ke pelanggan dalam Bahasa Indonesia yang sopan dan hangat, mengakui gangguan " +
-          "yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan offer; maksimal 90 kata, tanpa tanda tangan nama orang.",
+          "yang dialami, menyebut tindak lanjut teknis bila ada tiket, dan menawarkan penawaran itu dengan angka yang sama persis; " +
+          "jangan menyebut angka persen lain (misalnya packet loss); maksimal 90 kata, tanpa tanda tangan nama orang.",
         userPrompt:
           "Nama: {{input.name}}\nPaket: {{input.plan}} (Rp {{input.fee}}/bulan)\nKota: {{input.city}}\n" +
           "Lama berlangganan: {{input.tenure}} bulan, sisa kontrak: {{input.contractLeft}} bulan\n" +
@@ -370,15 +456,33 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           ticket: out("agentContext", "ticket"), score: out("agentContext", "score"),
           level: out("agentContext", "level"), reasons: out("agentContext", "reasons"),
         },
-        returns: { riskSummary: "string", recommendedAction: "string", offer: "string", followUpMessage: "string" },
+        returns: {
+          riskSummary: "string", recommendedAction: "string", offerType: "string", discountPercent: "number",
+          durationMonths: "number", technicianVisit: "boolean", followUpMessage: "string",
+        },
       }))
+      // the AI failing for one customer must not stop the others: the case goes to manual review
+      .onError((h) =>
+        h
+          .step("aiFailedCase", dataFabricUpdate({
+            entity: "CsRetentionCase",
+            record: { byId: out("openCase", "Id") },
+            set: {
+              CaseStatus: "Needs Manual Review",
+              Decision: "AI Failed",
+              ReviewerNote: js`"Rekomendasi AI gagal: " + (${err("recommend", "message")} || "tidak diketahui") + ". Tangani manual."`,
+            },
+          }))
+          .continue(),
+      )
       // FR-11 guardrail on the AI draft: the reviewer sees the result before deciding
       .step("policyCheck", script({
         code: POLICY_FN + `
-          return checkPolicy($vars.recommend.output.offer, $vars.recommend.output.followUpMessage,
+          const r = $vars.recommend.output;
+          return checkPolicy(r.offerType, r.discountPercent, r.durationMonths, r.technicianVisit, r.followUpMessage,
             $vars.eachCustomer.currentItem.contractMonthsLeft);
         `,
-        returns: { status: "string", issues: "string" },
+        returns: { status: "string", issues: "string", offer: "string" },
       }))
       .step("markPending", dataFabricUpdate({
         entity: "CsRetentionCase",
@@ -386,7 +490,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         set: {
           CaseStatus: "Pending Approval",
           RecommendedAction: out("recommend", "recommendedAction"),
-          OfferDetail: out("recommend", "offer"),
+          OfferDetail: out("policyCheck", "offer"),
+          OfferType: out("recommend", "offerType"),
+          DiscountPercent: out("recommend", "discountPercent"),
+          OfferMonths: out("recommend", "durationMonths"),
+          TechnicianVisit: out("recommend", "technicianVisit"),
           FollowUpMessage: out("recommend", "followUpMessage"),
           PolicyStatus: out("policyCheck", "status"),
           PolicyIssues: out("policyCheck", "issues"),
@@ -394,7 +502,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         },
       }))
 
-      // FR-07 human approval: the officer may edit offer and message before approving
+      // FR-07 human approval: the officer edits the structured offer and the message before approving
       .stepSwitch("retentionReview", hitl({
         title: "ChurnShield: review retention offer",
         priority: "High",
@@ -408,9 +516,14 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           { id: "reasons", label: "Alasan", type: "string", direction: "input", value: out("agentContext", "reasons") },
           { id: "riskSummary", label: "Ringkasan AI", type: "string", direction: "input", value: out("recommend", "riskSummary") },
           { id: "recommendedAction", label: "Rekomendasi tindakan", type: "string", direction: "input", value: out("recommend", "recommendedAction") },
+          { id: "aiDraft", label: "Draf penawaran AI", type: "string", direction: "input", value: out("policyCheck", "offer") },
           { id: "policyResult", label: "Cek kebijakan draf AI", type: "string", direction: "input",
             value: js`$vars.policyCheck.output.status + " - " + $vars.policyCheck.output.issues` },
-          { id: "offer", label: "Penawaran (boleh diedit)", type: "string", direction: "inOut", value: out("recommend", "offer") },
+          { id: "offerType", label: "Jenis penawaran (boleh diubah)", type: "singleSelect", direction: "inOut",
+            options: OFFER_OPTIONS, value: out("recommend", "offerType") },
+          { id: "discountPercent", label: "Diskon % (0 bila bukan diskon)", type: "number", direction: "inOut", value: out("recommend", "discountPercent") },
+          { id: "offerMonths", label: "Lama penawaran (bulan)", type: "number", direction: "inOut", value: out("recommend", "durationMonths") },
+          { id: "technicianVisit", label: "Tambah kunjungan teknisi prioritas", type: "boolean", direction: "inOut", value: out("recommend", "technicianVisit") },
           { id: "followUpMessage", label: "Pesan follow-up (boleh diedit)", type: "string", direction: "inOut", value: out("recommend", "followUpMessage") },
           { id: "reviewerNote", label: "Catatan reviewer", type: "string", direction: "output" },
         ],
@@ -423,10 +536,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
               // FR-11 the version the reviewer approved is checked again: edits cannot bypass policy
               .step("recheckPolicy", script({
                 code: POLICY_FN + `
-                  return checkPolicy($vars.retentionReview.output.offer, $vars.retentionReview.output.followUpMessage,
+                  const r = $vars.retentionReview.output;
+                  return checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage,
                     $vars.eachCustomer.currentItem.contractMonthsLeft);
                 `,
-                returns: { status: "string", issues: "string" },
+                returns: { status: "string", issues: "string", offer: "string" },
               }))
               .branch(
                 "offerWithinPolicy",
@@ -438,7 +552,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                     set: {
                       Decision: "Approved",
                       CaseStatus: "Follow-up Ready",
-                      OfferDetail: out("retentionReview", "offer"),
+                      OfferDetail: out("recheckPolicy", "offer"),
+                      OfferType: out("retentionReview", "offerType"),
+                      DiscountPercent: out("retentionReview", "discountPercent"),
+                      OfferMonths: out("retentionReview", "offerMonths"),
+                      TechnicianVisit: out("retentionReview", "technicianVisit"),
                       FollowUpMessage: out("retentionReview", "followUpMessage"),
                       ReviewerNote: out("retentionReview", "reviewerNote"),
                       PolicyStatus: "Compliant",
@@ -454,7 +572,8 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                       { id: "svCustomer", label: "Pelanggan", type: "string", direction: "input",
                         value: js`$vars.eachCustomer.currentItem.customerCode + " - " + $vars.eachCustomer.currentItem.customerName` },
                       { id: "svRevenue", label: "Revenue at risk (Rp/tahun)", type: "number", direction: "input", value: item("revenueAtRisk") },
-                      { id: "svOffer", label: "Penawaran yang disetujui reviewer", type: "string", direction: "input", value: out("retentionReview", "offer") },
+                      { id: "svOffer", label: "Penawaran yang disetujui reviewer", type: "string", direction: "input", value: out("recheckPolicy", "offer") },
+                      { id: "svMessage", label: "Pesan follow-up", type: "string", direction: "input", value: out("retentionReview", "followUpMessage") },
                       { id: "svIssues", label: "Pelanggaran kebijakan", type: "string", direction: "input", value: out("recheckPolicy", "issues") },
                       { id: "svReviewerNote", label: "Catatan reviewer", type: "string", direction: "input", value: out("retentionReview", "reviewerNote") },
                       { id: "supervisorNote", label: "Alasan keputusan supervisor", type: "string", direction: "output" },
@@ -470,7 +589,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                           set: {
                             Decision: "Approved (Exception)",
                             CaseStatus: "Follow-up Ready",
-                            OfferDetail: out("retentionReview", "offer"),
+                            OfferDetail: out("recheckPolicy", "offer"),
+                            OfferType: out("retentionReview", "offerType"),
+                            DiscountPercent: out("retentionReview", "discountPercent"),
+                            OfferMonths: out("retentionReview", "offerMonths"),
+                            TechnicianVisit: out("retentionReview", "technicianVisit"),
                             FollowUpMessage: out("retentionReview", "followUpMessage"),
                             ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
                             PolicyStatus: "Exception Approved",
@@ -487,7 +610,11 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                           set: {
                             Decision: "Rejected by Supervisor",
                             CaseStatus: "Closed - Offer Rejected",
-                            OfferDetail: out("retentionReview", "offer"),
+                            OfferDetail: out("recheckPolicy", "offer"),
+                            OfferType: out("retentionReview", "offerType"),
+                            DiscountPercent: out("retentionReview", "discountPercent"),
+                            OfferMonths: out("retentionReview", "offerMonths"),
+                            TechnicianVisit: out("retentionReview", "technicianVisit"),
                             ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
                             PolicyStatus: "Violation",
                             PolicyIssues: out("recheckPolicy", "issues"),
@@ -528,29 +655,39 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const exceptions = cases.filter((c) => c.Decision === "Approved (Exception)");
       const rejected = cases.filter((c) => c.Decision === "Rejected by Supervisor");
       const noAction = cases.filter((c) => c.Decision === "No Action");
+      const aiFailed = cases.filter((c) => c.Decision === "AI Failed");
       const escalated = cases.filter((c) => c.TicketEscalated === true);
-      const aiFlagged = cases.filter((c) => c.PolicyStatus !== "Compliant");
-      const protectedRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);
+      const aiFlagged = cases.filter((c) => c.PolicyStatus !== "Compliant" && c.Decision !== "No Action" && c.Decision !== "AI Failed");
+      // revenue of customers who will receive an approved offer; whether they stay is not tracked yet
+      const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);
       const rp = (n) => "Rp " + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
       const summary = "ChurnShield " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
-        $vars.scoringUsed + "), " + p.highRiskCount + " berisiko tinggi dengan revenue at risk " + rp(p.highRiskRevenue) +
+        $vars.scoringUsed + ", keluhan dibaca " + ($vars.complaintMode === "ai" ? "AI" : "kata kunci") + "), " +
+        p.highRiskCount + " berisiko tinggi dengan revenue at risk " + rp(p.highRiskRevenue) +
         "/tahun. " + cases.length + " kasus baru diproses: " + escalated.length + " tiket dieskalasi, " + approved.length +
-        " penawaran disetujui (" + rp(protectedRevenue) + "/tahun dilindungi" +
+        " penawaran disetujui (" + rp(offeredRevenue) + "/tahun ditawari retensi" +
         (exceptions.length ? ", " + exceptions.length + " lewat pengecualian supervisor" : "") + "), " +
-        (rejected.length ? rejected.length + " ditolak supervisor, " : "") + noAction.length + " tanpa tindakan." +
+        (rejected.length ? rejected.length + " ditolak supervisor, " : "") +
+        (aiFailed.length ? aiFailed.length + " perlu ditangani manual karena AI gagal, " : "") + noAction.length + " tanpa tindakan." +
+        (p.hiddenIntent.length ? " Peringatan dini: " + p.hiddenIntent.length + " pelanggan berskor rendah menyebut niat berhenti di keluhannya." : "") +
         (p.skipped.length ? " " + p.skipped.length + " pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak." : "") +
         (p.overdue.length ? " " + p.overdue.length + " approval lewat SLA " + $vars.cfgSlaHours + " jam ditandai untuk supervisor." : "") +
-        ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "");
+        ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "") +
+        ($vars.complaintMode !== "ai" && $vars.complaintNote ? " Catatan: " + $vars.complaintNote + "." : "");
       return {
         summary: summary,
         report: {
           runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,
+          complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,
           customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,
           highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,
           casesProcessed: cases.length, ticketsEscalated: escalated.length,
           offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
-          noAction: noAction.length, revenueProtected: protectedRevenue, policyNotCompliantAtClose: aiFlagged.length,
-          skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,
+          noAction: noAction.length, aiFailedManualReview: aiFailed.length,
+          revenueOfferedRetention: offeredRevenue,
+          revenueNote: "revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak",
+          policyNotCompliantAtClose: aiFlagged.length,
+          earlyWarningIntent: p.hiddenIntent, skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,
           cases: cases.map((c) => ({
             customer: c.CustomerCode + " " + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,
             revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,
