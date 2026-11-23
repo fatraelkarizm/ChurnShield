@@ -3,21 +3,35 @@
   "resources": [
     {
       "resource": "connection",
-      "key": "0e2e2927-fde7-4940-a117-827ec919d20e",
-      "id": "connection0e2e2927-fde7-4940-a117-827ec919d20e",
+      "key": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "id": "connection4fdab537-5416-45d8-843d-47e6eecc798d",
       "value": {
         "ConnectionId": {
-          "defaultValue": "0e2e2927-fde7-4940-a117-827ec919d20e",
+          "defaultValue": "4fdab537-5416-45d8-843d-47e6eecc798d",
           "isExpression": false,
           "displayName": "uipath-google-gmail connection"
         }
       },
       "metadata": {
-        "ActivityName": "sendNocEmail",
+        "ActivityName": "sendFollowUpEmail",
         "BindingsVersion": "2.2",
         "DisplayLabel": "uipath-google-gmail connection",
         "UseConnectionService": "true",
         "Connector": "uipath-google-gmail"
+      }
+    },
+    {
+      "resource": "TimeTrigger",
+      "key": "dailyRun",
+      "id": "TimeTrigger_dailyRun",
+      "value": {},
+      "metadata": {
+        "TimeZone": null,
+        "CronExpression": "0 0 7 * * ?",
+        "ActivityName": "Time Trigger",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "FullName",
+        "SolutionsSupport": "true"
       }
     }
   ]

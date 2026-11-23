@@ -5,5 +5,5 @@
   "externalModelUrl": "",
   "contactCooldownDays": 30,
   "approvalSlaHours": 24,
-  "demoInbox": ""
+  "notifyEmail": ""
 }

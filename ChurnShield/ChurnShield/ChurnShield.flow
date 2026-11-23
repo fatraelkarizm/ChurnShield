@@ -1588,263 +1588,10 @@
             },
             {
               "field": "EscalationNote",
-              "value": "=js:\"ChurnShield \" + $vars.newRun.output + \": pelanggan \" + $vars.eachCustomer.currentItem.customerCode +\n                \" risiko churn \" + $vars.eachCustomer.currentItem.churnScore + \" (\" + $vars.eachCustomer.currentItem.riskLevel +\n                \"), revenue at risk Rp \" + $vars.eachCustomer.currentItem.revenueAtRisk + \"/tahun, lewat SLA \" +\n                $vars.eachCustomer.currentItem.hoursOverdue + \" jam. Prioritaskan penanganan.\""
+              "value": "=js:\"RADAR \" + $vars.newRun.output + \": pelanggan \" + $vars.eachCustomer.currentItem.customerCode +\n                \" risiko churn \" + $vars.eachCustomer.currentItem.churnScore + \" (\" + $vars.eachCustomer.currentItem.riskLevel +\n                \"), revenue at risk Rp \" + $vars.eachCustomer.currentItem.revenueAtRisk + \"/tahun, lewat SLA \" +\n                $vars.eachCustomer.currentItem.hoursOverdue + \" jam. Prioritaskan penanganan.\""
             }
           ]
         }
-      }
-    },
-    {
-      "id": "emailNoc",
-      "type": "core.logic.decision",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "emailNoc",
-        "icon": "trending-up-down"
-      },
-      "model": {
-        "type": "bpmn:InclusiveGateway"
-      },
-      "parentId": "eachCustomer",
-      "inputs": {
-        "trueLabel": "True",
-        "falseLabel": "False",
-        "expression": "$vars.cfgDemoInbox !== \"\""
-      }
-    },
-    {
-      "id": "sendNocEmail",
-      "type": "uipath.connector.uipath-google-gmail.send-email",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "sendNocEmail",
-        "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
-      },
-      "model": {
-        "type": "bpmn:SendTask",
-        "serviceType": "Intsvc.ActivityExecution",
-        "bindings": {
-          "resource": "connection",
-          "resourceKey": "",
-          "values": [
-            {
-              "name": "uipath-google-gmail connection",
-              "propertyAttribute": "ConnectionId"
-            },
-            {
-              "name": "FolderKey",
-              "propertyAttribute": "FolderKey"
-            }
-          ]
-        },
-        "context": [
-          {
-            "name": "connectorKey",
-            "type": "string",
-            "value": "uipath-google-gmail"
-          },
-          {
-            "name": "operation",
-            "type": "string"
-          },
-          {
-            "name": "objectName",
-            "value": "SendEmail",
-            "type": "string"
-          },
-          {
-            "name": "method",
-            "type": "string",
-            "value": "POST"
-          },
-          {
-            "name": "connection",
-            "type": "string",
-            "value": "<bindings.uipath-google-gmail connection>"
-          },
-          {
-            "name": "folderKey",
-            "type": "string",
-            "value": "<bindings.FolderKey>"
-          },
-          {
-            "name": "activityConfigurationVersion",
-            "type": "string",
-            "value": "v1"
-          },
-          {
-            "name": "metadata",
-            "body": {
-              "telemetryData": {
-                "connectorKey": "uipath-google-gmail",
-                "connectorName": "Send Email"
-              },
-              "inputMetadata": {},
-              "errorState": {
-                "hasError": true
-              }
-            },
-            "type": "json"
-          }
-        ]
-      },
-      "outputs": {
-        "output": {
-          "type": "object",
-          "description": "The return value of the connector.",
-          "source": "=result.response",
-          "var": "output"
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "parentId": "eachCustomer",
-      "inputs": {
-        "detail": {
-          "connector": "uipath-google-gmail",
-          "method": "POST",
-          "endpoint": "/SendEmail",
-          "objectName": "SendEmail",
-          "inputMetadata": {
-            "type": "multipart",
-            "multipart": {
-              "bodyFieldName": "body"
-            }
-          },
-          "errorState": {
-            "hasError": false
-          },
-          "telemetryData": {
-            "connectorKey": "uipath-google-gmail",
-            "connectorName": ""
-          },
-          "configuration": "=jsonString:{\"essentialConfiguration\":{\"customFieldsRequestDetails\":null,\"executionType\":null,\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"connectorVersion\":null,\"unifiedTypesCompatible\":true,\"savedFilterTrees\":null,\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"instanceParameters\":{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"path\":\"/SendEmail\"}}",
-          "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
-          "connectionId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionResourceId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionFolderKey": "c23bf442-8c88-4136-89f2-2233d509c239",
-          "bodyParameters": {
-            "Body": "=js:\"<p>Tiket <b>\" + $vars.eachCustomer.currentItem.overdueTicketCode + \"</b> (\" + $vars.eachCustomer.currentItem.overdueTicketCategory +\n                  \") sudah lewat SLA <b>\" + $vars.eachCustomer.currentItem.hoursOverdue + \" jam</b> dan dieskalasi otomatis.</p>\" +\n                  \"<p>Pelanggan: \" + $vars.eachCustomer.currentItem.customerCode + \" \" + $vars.eachCustomer.currentItem.customerName +\n                  \" (\" + $vars.eachCustomer.currentItem.servicePlan + \", \" + $vars.eachCustomer.currentItem.city + \")<br>\" +\n                  \"Skor risiko churn: <b>\" + $vars.eachCustomer.currentItem.churnScore + \"</b> (\" + $vars.eachCustomer.currentItem.riskLevel + \")<br>\" +\n                  \"Revenue at risk: <b>Rp \" + String($vars.eachCustomer.currentItem.revenueAtRisk).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\") + \"/tahun</b></p>\" +\n                  \"<p>Alasan: \" + $vars.eachCustomer.currentItem.reasons + \"</p>\" +\n                  \"<p>Mohon prioritaskan penanganan. Tim retensi sedang menyiapkan tindak lanjut ke pelanggan.</p>\" +\n                  \"<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis), run \" + $vars.newRun.output + \".</p>\"",
-            "Subject": "=js:\"[Demo ChurnShield | untuk NOC] Eskalasi \" + $vars.eachCustomer.currentItem.overdueTicketCode + \" - pelanggan risiko churn \" + $vars.eachCustomer.currentItem.riskLevel",
-            "To": "=js:$vars.cfgDemoInbox"
-          },
-          "queryParameters": {
-            "SaveAsDraft": false
-          },
-          "multipartParameters": [
-            {
-              "name": "file",
-              "dataType": "file"
-            },
-            {
-              "name": "body",
-              "dataType": "string"
-            }
-          ]
-        },
-        "errorHandlingEnabled": true
-      }
-    },
-    {
-      "id": "nocEmailFailed",
-      "type": "core.action.script",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "nocEmailFailed",
-        "icon": "code"
-      },
-      "model": {
-        "type": "bpmn:ScriptTask"
-      },
-      "outputs": {
-        "output": {
-          "type": "string",
-          "description": "The return value of the script",
-          "source": "=result.response",
-          "var": "output"
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "parentId": "eachCustomer",
-      "inputs": {
-        "script": "return \"NOC email failed\";"
       }
     },
     {
@@ -2270,7 +2017,7 @@
       },
       "parentId": "eachCustomer",
       "inputs": {
-        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n\n          const r = $vars.recommend.output;\n          return checkPolicy(r.offerType, r.discountPercent, r.durationMonths, r.technicianVisit, r.followUpMessage,\n            $vars.eachCustomer.currentItem.contractMonthsLeft);\n        "
+        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n  function escHtml(s) {\n    return String(s || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n  }\n  function buildCustomerEmailHtml(name, code, plan, city, offer, message, ticketCode, isException) {\n    const safeMsg = escHtml(message).split(String.fromCharCode(10)).join(\"<br/>\");\n    const ticketRow = ticketCode\n      ? \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Tiket gangguan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>\" + escHtml(ticketCode) + \" &mdash; diprioritaskan ke tim teknis</td></tr>\"\n      : \"\";\n    return \"<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>\"\n      + \"<div style='max-width:560px;margin:0 auto;'>\"\n      + \"<div style='border-bottom:2px solid #0062cc;padding-bottom:10px;margin-bottom:20px;'>\"\n      + \"<span style='font-size:14px;font-weight:700;color:#0e1721;letter-spacing:0.3px;'>Tim Layanan Pelanggan</span>\"\n      + \"</div>\"\n      + \"<p style='margin:0 0 16px 0;font-size:14.5px;line-height:1.65;color:#1f2937;'>\" + safeMsg + \"</p>\"\n      + \"<table cellspacing='0' cellpadding='0' style='width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:18px 0;padding:8px 0;'>\"\n      + \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Penawaran</td><td style='padding:5px 0;color:#111827;font-size:13px;font-weight:600;'>\" + escHtml(offer) + \"</td></tr>\"\n      + \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Pelanggan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>\" + escHtml(name) + \" (\" + escHtml(code) + \") &middot; \" + escHtml(plan) + \"</td></tr>\"\n      + ticketRow\n      + \"</table>\"\n      + \"<p style='margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#374151;'>Apabila Bapak/Ibu ingin mengatur jadwal kunjungan teknisi atau membutuhkan bantuan lebih lanjut, silakan balas langsung email ini agar tim kami segera membantu.</p>\"\n      + \"<p style='margin:0;font-size:14px;line-height:1.6;color:#111827;'>Salam hangat,<br/><strong>Tim Retensi &amp; Layanan Pelanggan</strong></p>\"\n      + \"<div style='margin-top:24px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;'>Ref: \" + escHtml(code) + \" &middot; \" + escHtml(city) + \"</div>\"\n      + \"</div></div>\";\n  }\n\n          const r = $vars.recommend.output;\n          return checkPolicy(r.offerType, r.discountPercent, r.durationMonths, r.technicianVisit, r.followUpMessage,\n            $vars.eachCustomer.currentItem.contractMonthsLeft);\n        "
       }
     },
     {
@@ -2406,7 +2153,7 @@
       "parentId": "eachCustomer",
       "inputs": {
         "type": "quick",
-        "title": "ChurnShield: review retention offer",
+        "title": "RADAR: review retention offer",
         "priority": "High",
         "recipient": {
           "channels": [
@@ -2589,6 +2336,12 @@
             },
             "offer": {
               "type": "string"
+            },
+            "emailHtml": {
+              "type": "string"
+            },
+            "exceptionEmailHtml": {
+              "type": "string"
             }
           }
         },
@@ -2635,7 +2388,7 @@
       },
       "parentId": "eachCustomer",
       "inputs": {
-        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n\n                  const r = $vars.retentionReview.output;\n                  return checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage,\n                    $vars.eachCustomer.currentItem.contractMonthsLeft);\n                "
+        "script": "\n  function offerText(type, pct, months, visit) {\n    const p = Number(pct || 0), n = Number(months || 0);\n    const t = type === \"Diskon\" ? \"Diskon \" + p + \"% selama \" + n + \" bulan\"\n      : type === \"Upgrade Kecepatan\" ? \"Upgrade kecepatan gratis selama \" + n + \" bulan\"\n      : type === \"Bulan Gratis\" ? \"Gratis \" + n + \" bulan langganan\"\n      : \"Jenis penawaran tidak dikenal (\" + type + \")\";\n    return (visit === true || visit === \"true\") ? t + \" + kunjungan teknisi prioritas\" : t;\n  }\n  function checkPolicy(type, pct, months, visit, message, contractLeft) {\n    const issues = [];\n    const p = Number(pct || 0), n = Number(months || 0);\n    if ([\"Diskon\", \"Upgrade Kecepatan\", \"Bulan Gratis\"].indexOf(type) < 0) issues.push(\"jenis penawaran harus Diskon, Upgrade Kecepatan, atau Bulan Gratis\");\n    if (n < 1) issues.push(\"durasi penawaran minimal 1 bulan\");\n    if (type === \"Diskon\") {\n      if (p <= 0) issues.push(\"persentase diskon belum diisi\");\n      if (p > 30) issues.push(\"diskon \" + p + \"% melebihi batas 30%\");\n      if (n > 3) issues.push(\"durasi \" + n + \" bulan melebihi batas 3 bulan\");\n    } else if (p > 0) {\n      issues.push(\"diskon \" + p + \"% digabung dengan \" + type + \" (hanya boleh satu jenis penawaran)\");\n    }\n    if (type === \"Upgrade Kecepatan\" && n > 3) issues.push(\"upgrade \" + n + \" bulan melebihi batas 3 bulan\");\n    if (type === \"Bulan Gratis\") {\n      if (n > 1) issues.push(\"gratis \" + n + \" bulan melebihi batas 1 bulan\");\n      if (Number(contractLeft) > 1) issues.push(\"bulan gratis hanya untuk kontrak <= 1 bulan (sisa kontrak \" + contractLeft + \" bulan)\");\n    }\n    // the follow-up message must not promise more than the structured offer\n    const m = String(message || \"\").toLowerCase();\n    if (m.trim() === \"\") issues.push(\"pesan follow-up kosong\");\n    (m.match(/[0-9]+ *(%|persen)/g) || []).map((x) => parseInt(x, 10)).forEach((x) => {\n      if (type !== \"Diskon\" || x !== p) issues.push(\"pesan menyebut \" + x + \"% yang tidak sama dengan penawaran\");\n    });\n    if ((m.match(/persen/g) || []).length > (m.match(/[0-9]+ *persen/g) || []).length) issues.push(\"pesan menyebut potongan tanpa angka yang jelas\");\n    [\"setengah harga\", \"separuh harga\", \"gratis selamanya\", \"gratis seumur\", \"selamanya gratis\", \"harga khusus selamanya\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"pesan menjanjikan '\" + w + \"' di luar penawaran\");\n    });\n    (m.match(/selama *[0-9]+ *bulan/g) || []).map((x) => parseInt(x.replace(\"selama\", \"\"), 10)).forEach((x) => {\n      if (x !== n) issues.push(\"pesan menyebut durasi \" + x + \" bulan, penawaran \" + n + \" bulan\");\n    });\n    if (type === \"Diskon\" && (m.match(/gratis *[0-9]+ *bulan|[0-9]+ *bulan *gratis/g) || []).length) issues.push(\"pesan menawarkan bulan gratis di luar penawaran\");\n    [\"dijamin\", \"tidak akan ada gangguan\", \"tidak akan terjadi gangguan\", \"bebas gangguan\", \"pasti stabil\", \"100% stabil\", \"uang kembali\"].forEach((w) => {\n      if (m.indexOf(w) >= 0) issues.push(\"janji yang tidak bisa dijamin: '\" + w + \"'\");\n    });\n    const words = m.split(\" \").filter((x) => x.trim() !== \"\").length;\n    if (words > 150) issues.push(\"pesan follow-up terlalu panjang (\" + words + \" kata, maks 150)\");\n    return { status: issues.length ? \"Violation\" : \"Compliant\", issues: issues.length ? issues.join(\"; \") : \"sesuai kebijakan\",\n      offer: offerText(type, p, n, visit) };\n  }\n  function escHtml(s) {\n    return String(s || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n  }\n  function buildCustomerEmailHtml(name, code, plan, city, offer, message, ticketCode, isException) {\n    const safeMsg = escHtml(message).split(String.fromCharCode(10)).join(\"<br/>\");\n    const ticketRow = ticketCode\n      ? \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Tiket gangguan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>\" + escHtml(ticketCode) + \" &mdash; diprioritaskan ke tim teknis</td></tr>\"\n      : \"\";\n    return \"<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>\"\n      + \"<div style='max-width:560px;margin:0 auto;'>\"\n      + \"<div style='border-bottom:2px solid #0062cc;padding-bottom:10px;margin-bottom:20px;'>\"\n      + \"<span style='font-size:14px;font-weight:700;color:#0e1721;letter-spacing:0.3px;'>Tim Layanan Pelanggan</span>\"\n      + \"</div>\"\n      + \"<p style='margin:0 0 16px 0;font-size:14.5px;line-height:1.65;color:#1f2937;'>\" + safeMsg + \"</p>\"\n      + \"<table cellspacing='0' cellpadding='0' style='width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:18px 0;padding:8px 0;'>\"\n      + \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Penawaran</td><td style='padding:5px 0;color:#111827;font-size:13px;font-weight:600;'>\" + escHtml(offer) + \"</td></tr>\"\n      + \"<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Pelanggan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>\" + escHtml(name) + \" (\" + escHtml(code) + \") &middot; \" + escHtml(plan) + \"</td></tr>\"\n      + ticketRow\n      + \"</table>\"\n      + \"<p style='margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#374151;'>Apabila Bapak/Ibu ingin mengatur jadwal kunjungan teknisi atau membutuhkan bantuan lebih lanjut, silakan balas langsung email ini agar tim kami segera membantu.</p>\"\n      + \"<p style='margin:0;font-size:14px;line-height:1.6;color:#111827;'>Salam hangat,<br/><strong>Tim Retensi &amp; Layanan Pelanggan</strong></p>\"\n      + \"<div style='margin-top:24px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;'>Ref: \" + escHtml(code) + \" &middot; \" + escHtml(city) + \"</div>\"\n      + \"</div></div>\";\n  }\n\n                  const r = $vars.retentionReview.output;\n                  const c = $vars.eachCustomer.currentItem;\n                  const res = checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage, c.contractMonthsLeft);\n                  const emailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, false);\n                  const exceptionEmailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, true);\n                  return { status: res.status, issues: res.issues, offer: res.offer, emailHtml: emailHtml, exceptionEmailHtml: exceptionEmailHtml };\n                "
       }
     },
     {
@@ -2728,11 +2481,11 @@
       }
     },
     {
-      "id": "emailCustomer",
+      "id": "shouldSendFollowUp",
       "type": "core.logic.decision",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "emailCustomer",
+        "label": "shouldSendFollowUp",
         "icon": "trending-up-down"
       },
       "model": {
@@ -2742,16 +2495,16 @@
       "inputs": {
         "trueLabel": "True",
         "falseLabel": "False",
-        "expression": "$vars.cfgDemoInbox !== \"\""
+        "expression": "$vars.cfgNotifyEmail !== \"\""
       }
     },
     {
-      "id": "sendFollowUp",
+      "id": "sendFollowUpEmail",
       "type": "uipath.connector.uipath-google-gmail.send-email",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "sendFollowUp",
-        "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
+        "label": "sendFollowUpEmail",
+        "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
       },
       "model": {
         "type": "bpmn:SendTask",
@@ -2891,13 +2644,13 @@
           },
           "configuration": "=jsonString:{\"essentialConfiguration\":{\"customFieldsRequestDetails\":null,\"executionType\":null,\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"connectorVersion\":null,\"unifiedTypesCompatible\":true,\"savedFilterTrees\":null,\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"instanceParameters\":{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"path\":\"/SendEmail\"}}",
           "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
-          "connectionId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionResourceId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionFolderKey": "c23bf442-8c88-4136-89f2-2233d509c239",
+          "connectionId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionResourceId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionFolderKey": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
           "bodyParameters": {
-            "Body": "=js:\"<p>\" + String($vars.retentionReview.output.followUpMessage).split(\"\\n\").join(\"<br>\") + \"</p>\" +\n          \"<p><b>Penawaran:</b> \" + $vars.recheckPolicy.output.offer + \"</p>\" +\n          \"<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). Penawaran disetujui oleh tim retensi.</p>\"",
-            "Subject": "=js:\"[Demo ChurnShield | untuk pelanggan \" + $vars.eachCustomer.currentItem.contactEmail + \"] Tindak lanjut layanan internet Anda\"",
-            "To": "=js:$vars.cfgDemoInbox"
+            "Body": "=js:$vars.recheckPolicy.output.emailHtml",
+            "Subject": "=js:\"Penawaran Khusus & Tindak Lanjut Layanan - \" + $vars.eachCustomer.currentItem.customerName + \" (\" + $vars.eachCustomer.currentItem.customerCode + \")\"",
+            "To": "=js:$vars.cfgNotifyEmail"
           },
           "queryParameters": {
             "SaveAsDraft": false
@@ -2917,42 +2670,11 @@
       }
     },
     {
-      "id": "followUpFailed",
+      "id": "markFollowUpSent",
       "type": "core.datafabric.update",
       "typeVersion": "1.0",
       "display": {
-        "label": "followUpFailed",
-        "icon": "layers-arrow-up-right"
-      },
-      "outputs": {
-        "output": {
-          "type": "jsonSchema",
-          "description": "Entity record after the update",
-          "source": "=response",
-          "var": "output"
-        }
-      },
-      "parentId": "eachCustomer",
-      "inputs": {
-        "entityConfig": {
-          "entityName": "CsRetentionCase",
-          "recordSource": "byId",
-          "recordId": "=js:$vars.openCase.output.Id",
-          "fieldUpdates": [
-            {
-              "field": "ReviewerNote",
-              "value": "=js:\"Email follow-up gagal terkirim: \" + ($vars.sendFollowUp.error.message || \"-\") + \". Status tetap Follow-up Ready.\""
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "markSent",
-      "type": "core.datafabric.update",
-      "typeVersion": "1.0",
-      "display": {
-        "label": "markSent",
+        "label": "markFollowUpSent",
         "icon": "layers-arrow-up-right"
       },
       "outputs": {
@@ -3025,7 +2747,7 @@
       "parentId": "eachCustomer",
       "inputs": {
         "type": "quick",
-        "title": "ChurnShield: penawaran di luar kebijakan",
+        "title": "RADAR: penawaran di luar kebijakan",
         "priority": "High",
         "recipient": {
           "channels": [
@@ -3181,11 +2903,11 @@
       }
     },
     {
-      "id": "emailCustomerEx",
+      "id": "shouldSendExceptionEmail",
       "type": "core.logic.decision",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "emailCustomerEx",
+        "label": "shouldSendExceptionEmail",
         "icon": "trending-up-down"
       },
       "model": {
@@ -3195,16 +2917,16 @@
       "inputs": {
         "trueLabel": "True",
         "falseLabel": "False",
-        "expression": "$vars.cfgDemoInbox !== \"\""
+        "expression": "$vars.cfgNotifyEmail !== \"\""
       }
     },
     {
-      "id": "sendFollowUpEx",
+      "id": "sendExceptionEmail",
       "type": "uipath.connector.uipath-google-gmail.send-email",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "sendFollowUpEx",
-        "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
+        "label": "sendExceptionEmail",
+        "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
       },
       "model": {
         "type": "bpmn:SendTask",
@@ -3344,13 +3066,13 @@
           },
           "configuration": "=jsonString:{\"essentialConfiguration\":{\"customFieldsRequestDetails\":null,\"executionType\":null,\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"connectorVersion\":null,\"unifiedTypesCompatible\":true,\"savedFilterTrees\":null,\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"instanceParameters\":{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"path\":\"/SendEmail\"}}",
           "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
-          "connectionId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionResourceId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionFolderKey": "c23bf442-8c88-4136-89f2-2233d509c239",
+          "connectionId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionResourceId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionFolderKey": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
           "bodyParameters": {
-            "Body": "=js:\"<p>\" + String($vars.retentionReview.output.followUpMessage).split(\"\\n\").join(\"<br>\") + \"</p>\" +\n          \"<p><b>Penawaran:</b> \" + $vars.recheckPolicy.output.offer + \"</p>\" +\n          \"<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). Penawaran disetujui oleh tim retensi.</p>\"",
-            "Subject": "=js:\"[Demo ChurnShield | untuk pelanggan \" + $vars.eachCustomer.currentItem.contactEmail + \"] Tindak lanjut layanan internet Anda\"",
-            "To": "=js:$vars.cfgDemoInbox"
+            "Body": "=js:$vars.recheckPolicy.output.exceptionEmailHtml",
+            "Subject": "=js:\"Penawaran Khusus Prioritas - \" + $vars.eachCustomer.currentItem.customerName + \" (\" + $vars.eachCustomer.currentItem.customerCode + \")\"",
+            "To": "=js:$vars.cfgNotifyEmail"
           },
           "queryParameters": {
             "SaveAsDraft": false
@@ -3370,42 +3092,11 @@
       }
     },
     {
-      "id": "followUpFailedEx",
+      "id": "markExceptionSent",
       "type": "core.datafabric.update",
       "typeVersion": "1.0",
       "display": {
-        "label": "followUpFailedEx",
-        "icon": "layers-arrow-up-right"
-      },
-      "outputs": {
-        "output": {
-          "type": "jsonSchema",
-          "description": "Entity record after the update",
-          "source": "=response",
-          "var": "output"
-        }
-      },
-      "parentId": "eachCustomer",
-      "inputs": {
-        "entityConfig": {
-          "entityName": "CsRetentionCase",
-          "recordSource": "byId",
-          "recordId": "=js:$vars.openCase.output.Id",
-          "fieldUpdates": [
-            {
-              "field": "ReviewerNote",
-              "value": "=js:\"Email follow-up gagal terkirim: \" + ($vars.sendFollowUpEx.error.message || \"-\") + \". Status tetap Follow-up Ready.\""
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "markSentEx",
-      "type": "core.datafabric.update",
-      "typeVersion": "1.0",
-      "display": {
-        "label": "markSentEx",
+        "label": "markExceptionSent",
         "icon": "layers-arrow-up-right"
       },
       "outputs": {
@@ -3643,15 +3334,15 @@
         }
       },
       "inputs": {
-        "script": "\n      const cases = $vars.readRunCases.output.results || [];\n      const p = $vars.prioritize.output;\n      const approved = cases.filter((c) => c.Decision === \"Approved\" || c.Decision === \"Approved (Exception)\");\n      const exceptions = cases.filter((c) => c.Decision === \"Approved (Exception)\");\n      const rejected = cases.filter((c) => c.Decision === \"Rejected by Supervisor\");\n      const noAction = cases.filter((c) => c.Decision === \"No Action\");\n      const aiFailed = cases.filter((c) => c.Decision === \"AI Failed\");\n      const sent = cases.filter((c) => c.CaseStatus === \"Follow-up Sent\");\n      const escalated = cases.filter((c) => c.TicketEscalated === true);\n      const aiFlagged = cases.filter((c) => c.PolicyStatus !== \"Compliant\" && c.Decision !== \"No Action\" && c.Decision !== \"AI Failed\");\n      // revenue of customers who will receive an approved offer; whether they stay is not tracked yet\n      const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);\n      const rp = (n) => \"Rp \" + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n      const summary = \"ChurnShield \" + $vars.newRun.output + \": \" + p.scoredCount + \" pelanggan dinilai (\" +\n        $vars.scoringUsed + \", keluhan dibaca \" + ($vars.complaintMode === \"ai\" ? \"AI\" : \"kata kunci\") + \"), \" +\n        p.highRiskCount + \" berisiko tinggi dengan revenue at risk \" + rp(p.highRiskRevenue) +\n        \"/tahun. \" + cases.length + \" kasus baru diproses: \" + escalated.length + \" tiket dieskalasi, \" + approved.length +\n        \" penawaran disetujui (\" + rp(offeredRevenue) + \"/tahun ditawari retensi\" +\n        (exceptions.length ? \", \" + exceptions.length + \" lewat pengecualian supervisor\" : \"\") + \"), \" +\n        (rejected.length ? rejected.length + \" ditolak supervisor, \" : \"\") +\n        (aiFailed.length ? aiFailed.length + \" perlu ditangani manual karena AI gagal, \" : \"\") + noAction.length + \" tanpa tindakan.\" +\n        ($vars.cfgDemoInbox !== \"\" ? \" \" + sent.length + \" email follow-up terkirim (mode demo).\" : \" Email belum dikirim (demoInbox kosong).\") +\n        (p.hiddenIntent.length ? \" Peringatan dini: \" + p.hiddenIntent.length + \" pelanggan berskor rendah menyebut niat berhenti di keluhannya.\" : \"\") +\n        (p.skipped.length ? \" \" + p.skipped.length + \" pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak.\" : \"\") +\n        (p.overdue.length ? \" \" + p.overdue.length + \" approval lewat SLA \" + $vars.cfgSlaHours + \" jam ditandai untuk supervisor.\" : \"\") +\n        ($vars.scoringNote ? \" Catatan: \" + $vars.scoringNote + \".\" : \"\") +\n        ($vars.complaintMode !== \"ai\" && $vars.complaintNote ? \" Catatan: \" + $vars.complaintNote + \".\" : \"\");\n      const esc = (s) => String(s == null ? \"-\" : s).replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n      const td = \"style='border:1px solid #ccc;padding:6px;vertical-align:top'\";\n      const kpi = (label, value, color) => \"<td style='padding:10px 16px;background:#EEF3F4;border-radius:6px'>\" +\n        \"<div style='font-size:22px;font-weight:bold;color:\" + color + \"'>\" + value + \"</div><div style='color:#3C5560'>\" + label + \"</div></td>\";\n      const reportHtml =\n        \"<h2 style='color:#0E2A33'>Laporan harian ChurnShield</h2><p>\" + esc(summary) + \"</p>\" +\n        \"<table cellspacing='8'><tr>\" +\n          kpi(\"pelanggan dinilai\", p.scoredCount, \"#0E2A33\") + kpi(\"berisiko tinggi\", p.highRiskCount, \"#D64545\") +\n          kpi(\"revenue at risk/tahun\", rp(p.highRiskRevenue), \"#D64545\") + kpi(\"tiket dieskalasi\", escalated.length, \"#F28C28\") +\n          kpi(\"ditawari retensi/tahun\", rp(offeredRevenue), \"#3E9E6A\") +\n        \"</tr></table>\" +\n        \"<h3>Kasus run ini</h3><table style='border-collapse:collapse'><tr>\" +\n          [\"Pelanggan\", \"Skor\", \"Keputusan\", \"Status\", \"Penawaran\", \"Kebijakan\"].map((h) => \"<th \" + td + \">\" + h + \"</th>\").join(\"\") + \"</tr>\" +\n          cases.map((c) => \"<tr><td \" + td + \">\" + esc(c.CustomerCode + \" \" + c.CustomerName) + \"</td><td \" + td + \">\" + esc(c.ChurnScore) +\n            \"</td><td \" + td + \">\" + esc(c.Decision) + \"</td><td \" + td + \">\" + esc(c.CaseStatus) + \"</td><td \" + td + \">\" + esc(c.OfferDetail) +\n            \"</td><td \" + td + \">\" + esc(c.PolicyStatus) + \"</td></tr>\").join(\"\") + \"</table>\" +\n        (p.hiddenIntent.length ? \"<h3>Peringatan dini: skor masih rendah, keluhan menyebut niat berhenti</h3><ul>\" +\n          p.hiddenIntent.map((x) => \"<li>\" + esc(x.customer) + \" (skor \" + x.churnScore + \"): \\\"\" + esc(x.complaint) + \"\\\"</li>\").join(\"\") + \"</ul>\" : \"\") +\n        (p.overdue.length ? \"<h3>Approval lewat SLA</h3><ul>\" + p.overdue.map((x) => \"<li>\" + esc(x.customerCode + \" \" + x.customerName) +\n          \", menunggu \" + x.hoursWaiting + \" jam</li>\").join(\"\") + \"</ul>\" : \"\") +\n        \"<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). \\\"Ditawari retensi\\\" = revenue pelanggan dengan penawaran disetujui; pelanggan bertahan atau tidak belum dilacak.</p>\";\n      return {\n        summary: summary,\n        reportHtml: reportHtml,\n        report: {\n          runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,\n          complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,\n          customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,\n          highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,\n          casesProcessed: cases.length, ticketsEscalated: escalated.length,\n          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,\n          noAction: noAction.length, aiFailedManualReview: aiFailed.length,\n          followUpsSent: sent.length, emailMode: $vars.cfgDemoInbox !== \"\" ? \"demo inbox\" : \"off\",\n          revenueOfferedRetention: offeredRevenue,\n          revenueNote: \"revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak\",\n          policyNotCompliantAtClose: aiFlagged.length,\n          earlyWarningIntent: p.hiddenIntent, skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,\n          cases: cases.map((c) => ({\n            customer: c.CustomerCode + \" \" + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,\n            revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,\n            status: c.CaseStatus, offer: c.OfferDetail, policy: c.PolicyStatus, policyIssues: c.PolicyIssues\n          }))\n        }\n      };\n    "
+        "script": "\n      const cases = $vars.readRunCases.output.results || [];\n      const p = $vars.prioritize.output;\n      const approved = cases.filter((c) => c.Decision === \"Approved\" || c.Decision === \"Approved (Exception)\");\n      const sent = cases.filter((c) => c.CaseStatus === \"Follow-up Sent\");\n      const exceptions = cases.filter((c) => c.Decision === \"Approved (Exception)\");\n      const rejected = cases.filter((c) => c.Decision === \"Rejected by Supervisor\");\n      const noAction = cases.filter((c) => c.Decision === \"No Action\");\n      const aiFailed = cases.filter((c) => c.Decision === \"AI Failed\");\n      const escalated = cases.filter((c) => c.TicketEscalated === true);\n      const aiFlagged = cases.filter((c) => c.PolicyStatus !== \"Compliant\" && c.Decision !== \"No Action\" && c.Decision !== \"AI Failed\");\n      // revenue of customers who will receive an approved offer; whether they stay is not tracked yet\n      const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);\n      const rp = (n) => \"Rp \" + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n      const summary = \"RADAR \" + $vars.newRun.output + \": \" + p.scoredCount + \" pelanggan dinilai (\" +\n        $vars.scoringUsed + \", keluhan dibaca \" + ($vars.complaintMode === \"ai\" ? \"AI\" : \"kata kunci\") + \"), \" +\n        p.highRiskCount + \" berisiko tinggi dengan revenue at risk \" + rp(p.highRiskRevenue) +\n        \"/tahun. \" + cases.length + \" kasus baru diproses: \" + escalated.length + \" tiket dieskalasi, \" + approved.length +\n        \" penawaran disetujui (\" + rp(offeredRevenue) + \"/tahun ditawari retensi\" +\n        (sent.length ? \", \" + sent.length + \" email terkirim\" : \"\") +\n        (exceptions.length ? \", \" + exceptions.length + \" lewat pengecualian supervisor\" : \"\") + \"), \" +\n        (rejected.length ? rejected.length + \" ditolak supervisor, \" : \"\") +\n        (aiFailed.length ? aiFailed.length + \" perlu ditangani manual karena AI gagal, \" : \"\") + noAction.length + \" tanpa tindakan.\" +\n        (p.hiddenIntent.length ? \" Peringatan dini: \" + p.hiddenIntent.length + \" pelanggan berskor rendah menyebut niat berhenti di keluhannya.\" : \"\") +\n        (p.skipped.length ? \" \" + p.skipped.length + \" pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak.\" : \"\") +\n        (p.overdue.length ? \" \" + p.overdue.length + \" approval lewat SLA \" + $vars.cfgSlaHours + \" jam ditandai untuk supervisor.\" : \"\") +\n        ($vars.scoringNote ? \" Catatan: \" + $vars.scoringNote + \".\" : \"\") +\n        ($vars.complaintMode !== \"ai\" && $vars.complaintNote ? \" Catatan: \" + $vars.complaintNote + \".\" : \"\");\n      const esc = (s) => String(s || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n      const caseRows = cases.map((c) =>\n        \"<tr>\" +\n        \"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#0f172a;font-weight:600;'>\" + esc(c.CustomerCode + \" \" + c.CustomerName) + \"</td>\" +\n        \"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>\" + esc(c.ChurnScore) + \" (\" + esc(c.RiskLevel) + \")</td>\" +\n        \"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>\" + esc(c.OfferDetail || \"-\") + \"</td>\" +\n        \"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:700;color:#0062cc;'>\" + esc(c.CaseStatus) + \"</td>\" +\n        \"</tr>\"\n      ).join(\"\");\n      const ewHtml = p.hiddenIntent.length\n        ? \"<div style='margin-top:20px;padding:12px 14px;background:#f8fafc;border-left:3px solid #0062cc;font-size:12.5px;color:#334155;'>\"\n          + \"<div style='font-weight:700;color:#0e1721;margin-bottom:6px;'>Peringatan Dini (\" + p.hiddenIntent.length + \" pelanggan skor rendah)</div>\"\n          + p.hiddenIntent.map((x) => \"<div style='margin-bottom:3px;'>&bull; <strong>\" + esc(x.customer) + \"</strong> (skor \" + x.churnScore + \"): &ldquo;\" + esc(x.complaint) + \"&rdquo;</div>\").join(\"\")\n          + \"</div>\"\n        : \"\";\n      const reportHtml = \"<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>\"\n        + \"<div style='max-width:640px;margin:0 auto;'>\"\n        + \"<div style='border-bottom:2px solid #0e1721;padding-bottom:10px;margin-bottom:18px;'>\"\n        + \"<div style='font-size:16px;font-weight:700;color:#0e1721;'>RADAR &mdash; Laporan Run Harian</div>\"\n        + \"<div style='font-size:12px;color:#64748b;margin-top:2px;'>Run ID: \" + esc($vars.newRun.output) + \" &middot; Scoring: \" + esc($vars.scoringUsed) + \" &middot; Analisis Keluhan: \" + ($vars.complaintMode === \"ai\" ? \"AI\" : \"Kata Kunci\") + \"</div>\"\n        + \"</div>\"\n        + \"<table width='100%' cellspacing='0' cellpadding='0' style='margin-bottom:16px;border-collapse:collapse;'><tr>\"\n        + \"<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Dinilai</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>\" + p.scoredCount + \"</div></td>\"\n        + \"<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Risiko Tinggi</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>\" + p.highRiskCount + \"</div></td>\"\n        + \"<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Tiket Dieskalasi</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>\" + escalated.length + \"</div></td>\"\n        + \"<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Email Terkirim</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>\" + sent.length + \" / \" + approved.length + \"</div></td>\"\n        + \"</tr></table>\"\n        + \"<p style='margin:0 0 18px 0;font-size:13.5px;line-height:1.6;color:#374151;'>\" + esc(summary) + \"</p>\"\n        + \"<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;border-top:1px solid #cbd5e1;'>\"\n        + \"<tr><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Pelanggan</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Skor</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Penawaran</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Status</th></tr>\"\n        + (caseRows || \"<tr><td colspan='4' style='padding:10px;font-size:13px;color:#64748b;'>Tidak ada kasus baru pada run ini.</td></tr>\")\n        + \"</table>\"\n        + ewHtml\n        + \"<div style='margin-top:20px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:11px;color:#94a3b8;'>Angka revenue menunjukkan pelanggan yang ditawari retensi; hasil aktual dilacak terpisah setelah integrasi billing. &middot; RADAR</div>\"\n        + \"</div></div>\";\n      return {\n        summary: summary,\n        reportHtml: reportHtml,\n        report: {\n          runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,\n          complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,\n          customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,\n          highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,\n          casesProcessed: cases.length, ticketsEscalated: escalated.length,\n          offersApproved: approved.length, emailsSent: sent.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,\n          noAction: noAction.length, aiFailedManualReview: aiFailed.length,\n          revenueOfferedRetention: offeredRevenue,\n          revenueNote: \"revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak\",\n          policyNotCompliantAtClose: aiFlagged.length,\n          earlyWarningIntent: p.hiddenIntent, skippedExistingCase: p.skipped, approvalsOverdue: p.overdue,\n          cases: cases.map((c) => ({\n            customer: c.CustomerCode + \" \" + c.CustomerName, churnScore: c.ChurnScore, riskLevel: c.RiskLevel,\n            revenueAtRisk: c.RevenueAtRisk, ticketEscalated: c.TicketEscalated, decision: c.Decision,\n            status: c.CaseStatus, offer: c.OfferDetail, policy: c.PolicyStatus, policyIssues: c.PolicyIssues\n          }))\n        }\n      };\n    "
       }
     },
     {
-      "id": "emailManager",
+      "id": "shouldSendReport",
       "type": "core.logic.decision",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "emailManager",
+        "label": "shouldSendReport",
         "icon": "trending-up-down"
       },
       "model": {
@@ -3660,16 +3351,16 @@
       "inputs": {
         "trueLabel": "True",
         "falseLabel": "False",
-        "expression": "$vars.cfgDemoInbox !== \"\""
+        "expression": "$vars.cfgNotifyEmail !== \"\""
       }
     },
     {
-      "id": "sendReportEmail",
+      "id": "sendRunReportEmail",
       "type": "uipath.connector.uipath-google-gmail.send-email",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "sendReportEmail",
-        "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
+        "label": "sendRunReportEmail",
+        "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg"
       },
       "model": {
         "type": "bpmn:SendTask",
@@ -3808,13 +3499,13 @@
           },
           "configuration": "=jsonString:{\"essentialConfiguration\":{\"customFieldsRequestDetails\":null,\"executionType\":null,\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"connectorVersion\":null,\"unifiedTypesCompatible\":true,\"savedFilterTrees\":null,\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"instanceParameters\":{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"path\":\"/SendEmail\"}}",
           "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
-          "connectionId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionResourceId": "0e2e2927-fde7-4940-a117-827ec919d20e",
-          "connectionFolderKey": "c23bf442-8c88-4136-89f2-2233d509c239",
+          "connectionId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionResourceId": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "connectionFolderKey": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
           "bodyParameters": {
             "Body": "=js:$vars.buildReport.output.reportHtml",
-            "Subject": "=js:\"[Demo ChurnShield | untuk manajer retensi] Laporan harian \" + $vars.newRun.output",
-            "To": "=js:$vars.cfgDemoInbox"
+            "Subject": "=js:\"[RADAR] Laporan Eksekutif Run \" + $vars.newRun.output",
+            "To": "=js:$vars.cfgNotifyEmail"
           },
           "queryParameters": {
             "SaveAsDraft": false
@@ -3834,11 +3525,11 @@
       }
     },
     {
-      "id": "reportEmailFailed",
+      "id": "finalReturn",
       "type": "core.action.script",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "reportEmailFailed",
+        "label": "finalReturn",
         "icon": "code"
       },
       "model": {
@@ -3846,7 +3537,7 @@
       },
       "outputs": {
         "output": {
-          "type": "string",
+          "type": "boolean",
           "description": "The return value of the script",
           "source": "=result.response",
           "var": "output"
@@ -3893,70 +3584,7 @@
         }
       },
       "inputs": {
-        "script": "return \"report email failed\";"
-      }
-    },
-    {
-      "id": "finish",
-      "type": "core.action.script",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "finish",
-        "icon": "code"
-      },
-      "model": {
-        "type": "bpmn:ScriptTask"
-      },
-      "outputs": {
-        "output": {
-          "type": "string",
-          "description": "The return value of the script",
-          "source": "=result.response",
-          "var": "output"
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "inputs": {
-        "script": "return \"done\";"
+        "script": "return true;"
       }
     },
     {
@@ -4102,15 +3730,15 @@
           },
           "var": "cfgSlaHours"
         },
-        "cfgDemoInbox": {
+        "cfgNotifyEmail": {
           "type": "string",
           "description": "",
           "source": {
             "type": "jsExpression",
-            "expression": "$vars.cfgDemoInbox",
+            "expression": "$vars.cfgNotifyEmail",
             "fieldType": "string"
           },
-          "var": "cfgDemoInbox"
+          "var": "cfgNotifyEmail"
         },
         "scored": {
           "type": "array",
@@ -4381,336 +4009,280 @@
       "id": "edge_24",
       "sourceNodeId": "escalateTicket",
       "sourcePort": "output",
-      "targetNodeId": "emailNoc",
+      "targetNodeId": "agentContext",
       "targetPort": "input"
     },
     {
       "id": "edge_25",
-      "sourceNodeId": "emailNoc",
-      "sourcePort": "true",
-      "targetNodeId": "sendNocEmail",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_26",
-      "sourceNodeId": "sendNocEmail",
-      "sourcePort": "error",
-      "targetNodeId": "nocEmailFailed",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_27",
-      "sourceNodeId": "sendNocEmail",
-      "sourcePort": "output",
-      "targetNodeId": "agentContext",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_28",
-      "sourceNodeId": "emailNoc",
-      "sourcePort": "false",
-      "targetNodeId": "agentContext",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_29",
       "sourceNodeId": "hasOverdueTicket",
       "sourcePort": "false",
       "targetNodeId": "agentContext",
       "targetPort": "input"
     },
     {
-      "id": "edge_30",
+      "id": "edge_26",
       "sourceNodeId": "agentContext",
       "sourcePort": "success",
       "targetNodeId": "recommend",
       "targetPort": "input"
     },
     {
-      "id": "edge_31",
+      "id": "edge_27",
       "sourceNodeId": "recommend",
       "sourcePort": "error",
       "targetNodeId": "aiFailedCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_32",
+      "id": "edge_28",
       "sourceNodeId": "aiFailedCase",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_33",
+      "id": "edge_29",
       "sourceNodeId": "recommend",
       "sourcePort": "success",
       "targetNodeId": "policyCheck",
       "targetPort": "input"
     },
     {
-      "id": "edge_34",
+      "id": "edge_30",
       "sourceNodeId": "policyCheck",
       "sourcePort": "success",
       "targetNodeId": "markPending",
       "targetPort": "input"
     },
     {
-      "id": "edge_35",
+      "id": "edge_31",
       "sourceNodeId": "markPending",
       "sourcePort": "output",
       "targetNodeId": "retentionReview",
       "targetPort": "input"
     },
     {
-      "id": "edge_36",
+      "id": "edge_32",
       "sourceNodeId": "retentionReview",
       "sourcePort": "outcome-approve-offer",
       "targetNodeId": "recheckPolicy",
       "targetPort": "input"
     },
     {
-      "id": "edge_37",
+      "id": "edge_33",
       "sourceNodeId": "recheckPolicy",
       "sourcePort": "success",
       "targetNodeId": "offerWithinPolicy",
       "targetPort": "input"
     },
     {
-      "id": "edge_38",
+      "id": "edge_34",
       "sourceNodeId": "offerWithinPolicy",
       "sourcePort": "true",
       "targetNodeId": "approveCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_39",
+      "id": "edge_35",
       "sourceNodeId": "approveCase",
       "sourcePort": "output",
-      "targetNodeId": "emailCustomer",
+      "targetNodeId": "shouldSendFollowUp",
       "targetPort": "input"
     },
     {
-      "id": "edge_40",
-      "sourceNodeId": "emailCustomer",
+      "id": "edge_36",
+      "sourceNodeId": "shouldSendFollowUp",
       "sourcePort": "true",
-      "targetNodeId": "sendFollowUp",
+      "targetNodeId": "sendFollowUpEmail",
       "targetPort": "input"
     },
     {
-      "id": "edge_41",
-      "sourceNodeId": "sendFollowUp",
+      "id": "edge_37",
+      "sourceNodeId": "sendFollowUpEmail",
       "sourcePort": "error",
-      "targetNodeId": "followUpFailed",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_42",
-      "sourceNodeId": "followUpFailed",
-      "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_43",
-      "sourceNodeId": "sendFollowUp",
+      "id": "edge_38",
+      "sourceNodeId": "sendFollowUpEmail",
       "sourcePort": "output",
-      "targetNodeId": "markSent",
+      "targetNodeId": "markFollowUpSent",
       "targetPort": "input"
     },
     {
-      "id": "edge_44",
+      "id": "edge_39",
       "sourceNodeId": "offerWithinPolicy",
       "sourcePort": "false",
       "targetNodeId": "supervisorReview",
       "targetPort": "input"
     },
     {
-      "id": "edge_45",
+      "id": "edge_40",
       "sourceNodeId": "supervisorReview",
       "sourcePort": "outcome-approve-exception",
       "targetNodeId": "approveException",
       "targetPort": "input"
     },
     {
-      "id": "edge_46",
+      "id": "edge_41",
       "sourceNodeId": "approveException",
       "sourcePort": "output",
-      "targetNodeId": "emailCustomerEx",
+      "targetNodeId": "shouldSendExceptionEmail",
       "targetPort": "input"
     },
     {
-      "id": "edge_47",
-      "sourceNodeId": "emailCustomerEx",
+      "id": "edge_42",
+      "sourceNodeId": "shouldSendExceptionEmail",
       "sourcePort": "true",
-      "targetNodeId": "sendFollowUpEx",
+      "targetNodeId": "sendExceptionEmail",
       "targetPort": "input"
     },
     {
-      "id": "edge_48",
-      "sourceNodeId": "sendFollowUpEx",
+      "id": "edge_43",
+      "sourceNodeId": "sendExceptionEmail",
       "sourcePort": "error",
-      "targetNodeId": "followUpFailedEx",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_49",
-      "sourceNodeId": "followUpFailedEx",
-      "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_50",
-      "sourceNodeId": "sendFollowUpEx",
+      "id": "edge_44",
+      "sourceNodeId": "sendExceptionEmail",
       "sourcePort": "output",
-      "targetNodeId": "markSentEx",
+      "targetNodeId": "markExceptionSent",
       "targetPort": "input"
     },
     {
-      "id": "edge_51",
+      "id": "edge_45",
       "sourceNodeId": "supervisorReview",
       "sourcePort": "outcome-reject-offer",
       "targetNodeId": "rejectOffer",
       "targetPort": "input"
     },
     {
-      "id": "edge_52",
+      "id": "edge_46",
       "sourceNodeId": "retentionReview",
       "sourcePort": "outcome-no-action",
       "targetNodeId": "closeCase",
       "targetPort": "input"
     },
     {
-      "id": "edge_53",
-      "sourceNodeId": "markSent",
+      "id": "edge_47",
+      "sourceNodeId": "markFollowUpSent",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_54",
-      "sourceNodeId": "emailCustomer",
+      "id": "edge_48",
+      "sourceNodeId": "shouldSendFollowUp",
       "sourcePort": "false",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_55",
-      "sourceNodeId": "markSentEx",
+      "id": "edge_49",
+      "sourceNodeId": "markExceptionSent",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_56",
-      "sourceNodeId": "emailCustomerEx",
+      "id": "edge_50",
+      "sourceNodeId": "shouldSendExceptionEmail",
       "sourcePort": "false",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_57",
+      "id": "edge_51",
       "sourceNodeId": "rejectOffer",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_58",
+      "id": "edge_52",
       "sourceNodeId": "closeCase",
       "sourcePort": "output",
       "targetNodeId": "eachCustomer",
       "targetPort": "continue"
     },
     {
-      "id": "edge_59",
+      "id": "edge_53",
       "sourceNodeId": "eachCustomer",
       "sourcePort": "success",
       "targetNodeId": "readRunCases",
       "targetPort": "input"
     },
     {
-      "id": "edge_60",
+      "id": "edge_54",
       "sourceNodeId": "readRunCases",
       "sourcePort": "output",
       "targetNodeId": "buildReport",
       "targetPort": "input"
     },
     {
-      "id": "edge_61",
+      "id": "edge_55",
       "sourceNodeId": "buildReport",
       "sourcePort": "success",
-      "targetNodeId": "emailManager",
+      "targetNodeId": "shouldSendReport",
       "targetPort": "input"
     },
     {
-      "id": "edge_62",
-      "sourceNodeId": "emailManager",
+      "id": "edge_56",
+      "sourceNodeId": "shouldSendReport",
       "sourcePort": "true",
-      "targetNodeId": "sendReportEmail",
+      "targetNodeId": "sendRunReportEmail",
       "targetPort": "input"
     },
     {
-      "id": "edge_63",
-      "sourceNodeId": "sendReportEmail",
-      "sourcePort": "error",
-      "targetNodeId": "reportEmailFailed",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_64",
-      "sourceNodeId": "sendReportEmail",
+      "id": "edge_57",
+      "sourceNodeId": "sendRunReportEmail",
       "sourcePort": "output",
-      "targetNodeId": "finish",
+      "targetNodeId": "finalReturn",
       "targetPort": "input"
     },
     {
-      "id": "edge_65",
-      "sourceNodeId": "emailManager",
+      "id": "edge_58",
+      "sourceNodeId": "shouldSendReport",
       "sourcePort": "false",
-      "targetNodeId": "finish",
+      "targetNodeId": "finalReturn",
       "targetPort": "input"
     },
     {
-      "id": "edge_66",
-      "sourceNodeId": "finish",
+      "id": "edge_59",
+      "sourceNodeId": "finalReturn",
       "sourcePort": "success",
       "targetNodeId": "end",
       "targetPort": "input"
     },
     {
-      "id": "edge_67",
+      "id": "edge_60",
       "sourceNodeId": "dailyRun",
       "sourcePort": "output",
       "targetNodeId": "newRun",
       "targetPort": "input"
     },
     {
-      "id": "edge_68",
+      "id": "edge_61",
       "sourceNodeId": "complaintFallback",
       "sourcePort": "success",
       "targetNodeId": "scoreRules",
       "targetPort": "input"
     },
     {
-      "id": "edge_69",
+      "id": "edge_62",
       "sourceNodeId": "modelFallback",
       "sourcePort": "success",
       "targetNodeId": "prioritize",
       "targetPort": "input"
     },
     {
-      "id": "edge_70",
-      "sourceNodeId": "nocEmailFailed",
-      "sourcePort": "success",
-      "targetNodeId": "agentContext",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_71",
-      "sourceNodeId": "reportEmailFailed",
-      "sourcePort": "success",
-      "targetNodeId": "finish",
+      "id": "edge_63",
+      "sourceNodeId": "sendRunReportEmail",
+      "sourcePort": "error",
+      "targetNodeId": "finalReturn",
       "targetPort": "input"
     }
   ],
@@ -6856,299 +6428,6 @@
       }
     },
     {
-      "nodeType": "uipath.connector.uipath-google-gmail.send-email",
-      "version": "1.0.0",
-      "category": "connector.113548",
-      "tags": [
-        "connector",
-        "activity",
-        "API.File.Upload.Optional"
-      ],
-      "sortOrder": 520,
-      "supportsErrorHandling": true,
-      "description": "Sends an email message",
-      "display": {
-        "label": "Send Email",
-        "description": "Sends an email message",
-        "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
-        "sourceDisplayName": "Gmail"
-      },
-      "handleConfiguration": [
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input",
-              "label": ""
-            }
-          ]
-        },
-        {
-          "position": "right",
-          "handles": [
-            {
-              "id": "output",
-              "type": "source",
-              "handleType": "output",
-              "label": ""
-            },
-            {
-              "id": "error",
-              "label": "Error",
-              "type": "source",
-              "handleType": "output",
-              "visible": "{inputs.errorHandlingEnabled}",
-              "constraints": {
-                "maxConnections": 1
-              }
-            }
-          ]
-        },
-        {
-          "position": "top",
-          "customPositionAndOffsets": {
-            "right": 36,
-            "width": 22
-          },
-          "handles": [
-            {
-              "id": "timeout",
-              "label": "Timeout",
-              "type": "source",
-              "handleType": "output",
-              "visible": "{inputs.timeLimitEnabled}",
-              "labelVisibility": "hover"
-            }
-          ],
-          "visible": true
-        }
-      ],
-      "model": {
-        "type": "bpmn:SendTask",
-        "serviceType": "Intsvc.ActivityExecution",
-        "bindings": {
-          "resource": "connection",
-          "resourceKey": "",
-          "values": [
-            {
-              "name": "uipath-google-gmail connection",
-              "propertyAttribute": "ConnectionId"
-            },
-            {
-              "name": "FolderKey",
-              "propertyAttribute": "FolderKey"
-            }
-          ]
-        },
-        "context": [
-          {
-            "name": "connectorKey",
-            "type": "string",
-            "value": "uipath-google-gmail"
-          },
-          {
-            "name": "operation",
-            "type": "string"
-          },
-          {
-            "name": "objectName",
-            "value": "SendEmail",
-            "type": "string"
-          },
-          {
-            "name": "method",
-            "type": "string",
-            "value": "POST"
-          },
-          {
-            "name": "connection",
-            "type": "string",
-            "value": "<bindings.uipath-google-gmail connection>"
-          },
-          {
-            "name": "folderKey",
-            "type": "string",
-            "value": "<bindings.FolderKey>"
-          },
-          {
-            "name": "activityConfigurationVersion",
-            "type": "string",
-            "value": "v1"
-          },
-          {
-            "name": "metadata",
-            "body": {
-              "telemetryData": {
-                "connectorKey": "uipath-google-gmail",
-                "connectorName": "Send Email"
-              },
-              "inputMetadata": {},
-              "errorState": {
-                "hasError": true
-              }
-            },
-            "type": "json"
-          }
-        ]
-      },
-      "form": {
-        "id": "connector-properties",
-        "title": "Connector configuration",
-        "sections": [
-          {
-            "id": "connector",
-            "title": "Connector",
-            "collapsible": true,
-            "defaultExpanded": true,
-            "fields": [
-              {
-                "label": "",
-                "name": "inputs.detail",
-                "type": "custom",
-                "component": "dap-config",
-                "componentProps": {
-                  "connectorDetail": {
-                    "isAppActivity": false,
-                    "packageId": "113548",
-                    "svgIconUrl": "icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
-                    "displayName": "Send Email",
-                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.36.0.0, Culture=neutral, PublicKeyToken=null",
-                    "description": "Sends an email message",
-                    "category": "",
-                    "activityColor": "#E56D5C",
-                    "configuration": "{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"}",
-                    "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
-                    "isExperimental": false,
-                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-google-gmail-Send-Email",
-                    "isEnabled": true,
-                    "targetPlatform": "CrossPlatform",
-                    "isAdvanced": false,
-                    "isRestricted": false,
-                    "hasWpfOnlyDesigner": false,
-                    "tags": [
-                      "API.File.Upload.Optional"
-                    ]
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "inputDefinition": {
-        "fields": [
-          {
-            "name": "BCC",
-            "type": "string",
-            "displayName": "BCC",
-            "description": "The hidden recipients of the email, separated by comma (,)",
-            "required": false
-          },
-          {
-            "name": "Body",
-            "type": "string",
-            "displayName": "Body",
-            "description": "The body of the email",
-            "required": false
-          },
-          {
-            "name": "CC",
-            "type": "string",
-            "displayName": "CC",
-            "description": "The secondary recipients of the email, separated by comma (,)",
-            "required": false
-          },
-          {
-            "name": "Importance",
-            "type": "string",
-            "displayName": "Importance",
-            "description": "The importance of the mail",
-            "enum": [
-              "normal",
-              "high",
-              "low"
-            ],
-            "required": false
-          },
-          {
-            "name": "ReplyTo",
-            "type": "string",
-            "displayName": "Reply to",
-            "description": "The email addresses to use when replying, separated by comma (,)",
-            "required": false
-          },
-          {
-            "name": "Subject",
-            "type": "string",
-            "displayName": "Subject",
-            "description": "The subject of the email",
-            "required": false
-          },
-          {
-            "name": "To",
-            "type": "string",
-            "displayName": "To",
-            "description": "The primary recipients of the email, separated by comma (,)",
-            "required": true
-          }
-        ]
-      },
-      "inputDefaults": {},
-      "outputDefinition": {
-        "output": {
-          "type": "object",
-          "description": "The return value of the connector.",
-          "source": "=result.response",
-          "var": "output"
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "debug": {
-        "runtime": "bpmnEngine"
-      }
-    },
-    {
       "nodeType": "uipath.human-in-the-loop",
       "version": "1.1",
       "category": "human-task",
@@ -7366,6 +6645,281 @@
       }
     },
     {
+      "nodeType": "uipath.connector.uipath-google-gmail.send-email",
+      "version": "1.0.0",
+      "category": "connector.196556",
+      "tags": [
+        "connector",
+        "activity",
+        "API.File.Upload.Optional"
+      ],
+      "sortOrder": 520,
+      "supportsErrorHandling": true,
+      "description": "Sends an email message",
+      "display": {
+        "label": "Send Email",
+        "description": "Sends an email message",
+        "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
+        "sourceDisplayName": "Gmail"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input",
+              "label": ""
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "label": ""
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:SendTask",
+        "serviceType": "Intsvc.ActivityExecution",
+        "bindings": {
+          "resource": "connection",
+          "resourceKey": "",
+          "values": [
+            {
+              "name": "uipath-google-gmail connection",
+              "propertyAttribute": "ConnectionId"
+            },
+            {
+              "name": "FolderKey",
+              "propertyAttribute": "FolderKey"
+            }
+          ]
+        },
+        "context": [
+          {
+            "name": "connectorKey",
+            "type": "string",
+            "value": "uipath-google-gmail"
+          },
+          {
+            "name": "operation",
+            "type": "string"
+          },
+          {
+            "name": "objectName",
+            "value": "SendEmail",
+            "type": "string"
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "value": "POST"
+          },
+          {
+            "name": "connection",
+            "type": "string",
+            "value": "<bindings.uipath-google-gmail connection>"
+          },
+          {
+            "name": "folderKey",
+            "type": "string",
+            "value": "<bindings.FolderKey>"
+          },
+          {
+            "name": "activityConfigurationVersion",
+            "type": "string",
+            "value": "v1"
+          },
+          {
+            "name": "metadata",
+            "body": {
+              "telemetryData": {
+                "connectorKey": "uipath-google-gmail",
+                "connectorName": "Send Email"
+              },
+              "inputMetadata": {},
+              "errorState": {
+                "hasError": true
+              }
+            },
+            "type": "json"
+          }
+        ]
+      },
+      "form": {
+        "id": "connector-properties",
+        "title": "Connector configuration",
+        "sections": [
+          {
+            "id": "connector",
+            "title": "Connector",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "label": "",
+                "name": "inputs.detail",
+                "type": "custom",
+                "component": "dap-config",
+                "componentProps": {
+                  "connectorDetail": {
+                    "isAppActivity": false,
+                    "packageId": "196556",
+                    "svgIconUrl": "icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
+                    "displayName": "Send Email",
+                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.37.0.0, Culture=neutral, PublicKeyToken=null",
+                    "description": "Sends an email message",
+                    "category": "",
+                    "activityColor": "#E56D5C",
+                    "configuration": "{\"connectorKey\":\"uipath-google-gmail\",\"objectName\":\"SendEmail\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"}",
+                    "uiPathActivityTypeId": "f2a5320d-a0d1-3aec-af8f-5b16ad9665a0",
+                    "isExperimental": false,
+                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-google-gmail-Send-Email",
+                    "isEnabled": true,
+                    "targetPlatform": "CrossPlatform",
+                    "isAdvanced": false,
+                    "isRestricted": false,
+                    "hasWpfOnlyDesigner": false,
+                    "tags": [
+                      "API.File.Upload.Optional"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {
+        "fields": [
+          {
+            "name": "BCC",
+            "type": "string",
+            "displayName": "BCC",
+            "description": "The hidden recipients of the email, separated by comma (,)",
+            "required": false
+          },
+          {
+            "name": "Body",
+            "type": "string",
+            "displayName": "Body",
+            "description": "The body of the email",
+            "required": false
+          },
+          {
+            "name": "CC",
+            "type": "string",
+            "displayName": "CC",
+            "description": "The secondary recipients of the email, separated by comma (,)",
+            "required": false
+          },
+          {
+            "name": "Importance",
+            "type": "string",
+            "displayName": "Importance",
+            "description": "The importance of the mail",
+            "enum": [
+              "normal",
+              "high",
+              "low"
+            ],
+            "required": false
+          },
+          {
+            "name": "ReplyTo",
+            "type": "string",
+            "displayName": "Reply to",
+            "description": "The email addresses to use when replying, separated by comma (,)",
+            "required": false
+          },
+          {
+            "name": "Subject",
+            "type": "string",
+            "displayName": "Subject",
+            "description": "The subject of the email",
+            "required": false
+          },
+          {
+            "name": "To",
+            "type": "string",
+            "displayName": "To",
+            "description": "The primary recipients of the email, separated by comma (,)",
+            "required": true
+          }
+        ]
+      },
+      "inputDefaults": {},
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the connector.",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
+      }
+    },
+    {
       "nodeType": "core.control.end",
       "version": "1.0.0",
       "category": "control-flow",
@@ -7562,8 +7116,8 @@
         "defaultValue": 24
       },
       {
-        "id": "demoInbox",
-        "name": "demoInbox",
+        "id": "notifyEmail",
+        "name": "notifyEmail",
         "direction": "in",
         "type": "string",
         "triggerNodeId": "start",
@@ -7654,8 +7208,8 @@
         "defaultValue": 24
       },
       {
-        "id": "cfgDemoInbox",
-        "name": "cfgDemoInbox",
+        "id": "cfgNotifyEmail",
+        "name": "cfgNotifyEmail",
         "direction": "inout",
         "type": "string",
         "defaultValue": ""
@@ -8415,110 +7969,6 @@
         }
       },
       {
-        "id": "sendNocEmail.output",
-        "type": "object",
-        "description": "The return value of the connector.",
-        "binding": {
-          "nodeId": "sendNocEmail",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "sendNocEmail.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "sendNocEmail",
-          "outputId": "error"
-        }
-      },
-      {
-        "id": "nocEmailFailed.output",
-        "type": "string",
-        "description": "The return value of the script",
-        "binding": {
-          "nodeId": "nocEmailFailed",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "nocEmailFailed.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "nocEmailFailed",
-          "outputId": "error"
-        }
-      },
-      {
         "id": "agentContext.output",
         "type": "object",
         "description": "The return value of the script",
@@ -8798,16 +8248,16 @@
         }
       },
       {
-        "id": "sendFollowUp.output",
+        "id": "sendFollowUpEmail.output",
         "type": "object",
         "description": "The return value of the connector.",
         "binding": {
-          "nodeId": "sendFollowUp",
+          "nodeId": "sendFollowUpEmail",
           "outputId": "output"
         }
       },
       {
-        "id": "sendFollowUp.error",
+        "id": "sendFollowUpEmail.error",
         "type": "object",
         "description": "Error information if the node fails",
         "schema": {
@@ -8845,25 +8295,16 @@
           "additionalProperties": false
         },
         "binding": {
-          "nodeId": "sendFollowUp",
+          "nodeId": "sendFollowUpEmail",
           "outputId": "error"
         }
       },
       {
-        "id": "followUpFailed.output",
+        "id": "markFollowUpSent.output",
         "type": "jsonSchema",
         "description": "Entity record after the update",
         "binding": {
-          "nodeId": "followUpFailed",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "markSent.output",
-        "type": "jsonSchema",
-        "description": "Entity record after the update",
-        "binding": {
-          "nodeId": "markSent",
+          "nodeId": "markFollowUpSent",
           "outputId": "output"
         }
       },
@@ -8895,16 +8336,16 @@
         }
       },
       {
-        "id": "sendFollowUpEx.output",
+        "id": "sendExceptionEmail.output",
         "type": "object",
         "description": "The return value of the connector.",
         "binding": {
-          "nodeId": "sendFollowUpEx",
+          "nodeId": "sendExceptionEmail",
           "outputId": "output"
         }
       },
       {
-        "id": "sendFollowUpEx.error",
+        "id": "sendExceptionEmail.error",
         "type": "object",
         "description": "Error information if the node fails",
         "schema": {
@@ -8942,25 +8383,16 @@
           "additionalProperties": false
         },
         "binding": {
-          "nodeId": "sendFollowUpEx",
+          "nodeId": "sendExceptionEmail",
           "outputId": "error"
         }
       },
       {
-        "id": "followUpFailedEx.output",
+        "id": "markExceptionSent.output",
         "type": "jsonSchema",
         "description": "Entity record after the update",
         "binding": {
-          "nodeId": "followUpFailedEx",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "markSentEx.output",
-        "type": "jsonSchema",
-        "description": "Entity record after the update",
-        "binding": {
-          "nodeId": "markSentEx",
+          "nodeId": "markExceptionSent",
           "outputId": "output"
         }
       },
@@ -9044,16 +8476,16 @@
         }
       },
       {
-        "id": "sendReportEmail.output",
+        "id": "sendRunReportEmail.output",
         "type": "object",
         "description": "The return value of the connector.",
         "binding": {
-          "nodeId": "sendReportEmail",
+          "nodeId": "sendRunReportEmail",
           "outputId": "output"
         }
       },
       {
-        "id": "sendReportEmail.error",
+        "id": "sendRunReportEmail.error",
         "type": "object",
         "description": "Error information if the node fails",
         "schema": {
@@ -9091,21 +8523,21 @@
           "additionalProperties": false
         },
         "binding": {
-          "nodeId": "sendReportEmail",
+          "nodeId": "sendRunReportEmail",
           "outputId": "error"
         }
       },
       {
-        "id": "reportEmailFailed.output",
-        "type": "string",
+        "id": "finalReturn.output",
+        "type": "boolean",
         "description": "The return value of the script",
         "binding": {
-          "nodeId": "reportEmailFailed",
+          "nodeId": "finalReturn",
           "outputId": "output"
         }
       },
       {
-        "id": "reportEmailFailed.error",
+        "id": "finalReturn.error",
         "type": "object",
         "description": "Error information if the node fails",
         "schema": {
@@ -9143,65 +8575,14 @@
           "additionalProperties": false
         },
         "binding": {
-          "nodeId": "reportEmailFailed",
-          "outputId": "error"
-        }
-      },
-      {
-        "id": "finish.output",
-        "type": "string",
-        "description": "The return value of the script",
-        "binding": {
-          "nodeId": "finish",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "finish.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "finish",
+          "nodeId": "finalReturn",
           "outputId": "error"
         }
       },
       {
         "id": "end.runId",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "runId"
@@ -9210,6 +8591,7 @@
       {
         "id": "end.scoringModeUsed",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "scoringModeUsed"
@@ -9218,6 +8600,7 @@
       {
         "id": "end.summary",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "summary"
@@ -9226,6 +8609,7 @@
       {
         "id": "end.customersScored",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "customersScored"
@@ -9234,6 +8618,7 @@
       {
         "id": "end.highRiskCount",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "highRiskCount"
@@ -9242,6 +8627,7 @@
       {
         "id": "end.revenueAtRisk",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "revenueAtRisk"
@@ -9250,6 +8636,7 @@
       {
         "id": "end.report",
         "type": "object",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "report"
@@ -9258,6 +8645,7 @@
       {
         "id": "end.cfgThreshold",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgThreshold"
@@ -9266,6 +8654,7 @@
       {
         "id": "end.cfgTopN",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgTopN"
@@ -9274,6 +8663,7 @@
       {
         "id": "end.cfgMode",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgMode"
@@ -9282,6 +8672,7 @@
       {
         "id": "end.cfgModelUrl",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgModelUrl"
@@ -9290,6 +8681,7 @@
       {
         "id": "end.cfgCooldownDays",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgCooldownDays"
@@ -9298,22 +8690,25 @@
       {
         "id": "end.cfgSlaHours",
         "type": "number",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "cfgSlaHours"
         }
       },
       {
-        "id": "end.cfgDemoInbox",
+        "id": "end.cfgNotifyEmail",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
-          "outputId": "cfgDemoInbox"
+          "outputId": "cfgNotifyEmail"
         }
       },
       {
         "id": "end.scored",
         "type": "array",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "scored"
@@ -9322,6 +8717,7 @@
       {
         "id": "end.scoringUsed",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "scoringUsed"
@@ -9330,6 +8726,7 @@
       {
         "id": "end.scoringNote",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "scoringNote"
@@ -9338,6 +8735,7 @@
       {
         "id": "end.complaintMode",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "complaintMode"
@@ -9346,6 +8744,7 @@
       {
         "id": "end.aiNegative",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "aiNegative"
@@ -9354,6 +8753,7 @@
       {
         "id": "end.aiIntent",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "aiIntent"
@@ -9362,6 +8762,7 @@
       {
         "id": "end.complaintNote",
         "type": "string",
+        "description": "",
         "binding": {
           "nodeId": "end",
           "outputId": "complaintNote"
@@ -9525,10 +8926,10 @@
           }
         },
         {
-          "variableId": "cfgDemoInbox",
+          "variableId": "cfgNotifyEmail",
           "expression": {
             "type": "jsExpression",
-            "expression": "$vars.start.output.demoInbox",
+            "expression": "$vars.start.output.notifyEmail",
             "fieldType": "string"
           }
         }
@@ -9558,8 +8959,8 @@
       "name": "uipath-google-gmail connection",
       "type": "string",
       "resource": "connection",
-      "resourceKey": "0e2e2927-fde7-4940-a117-827ec919d20e",
-      "default": "0e2e2927-fde7-4940-a117-827ec919d20e",
+      "resourceKey": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "default": "4fdab537-5416-45d8-843d-47e6eecc798d",
       "propertyAttribute": "ConnectionId"
     },
     {
@@ -9567,8 +8968,8 @@
       "name": "FolderKey",
       "type": "string",
       "resource": "connection",
-      "resourceKey": "0e2e2927-fde7-4940-a117-827ec919d20e",
-      "default": "c23bf442-8c88-4136-89f2-2233d509c239",
+      "resourceKey": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "default": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
       "propertyAttribute": "FolderKey"
     }
   ],
@@ -9835,22 +9236,22 @@
       "eachCustomer": {
         "position": {
           "x": 3408,
-          "y": -288
+          "y": -240
         },
         "size": {
-          "width": 3312,
-          "height": 624
+          "width": 2816,
+          "height": 496
         },
         "collapsed": false,
         "placeholder": {
           "x": 3408,
-          "y": -288
+          "y": -240
         }
       },
       "openCase": {
         "position": {
           "x": 144,
-          "y": 304
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -9859,13 +9260,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 144,
-          "y": 304
+          "y": 224
         }
       },
       "hasOverdueTicket": {
         "position": {
           "x": 304,
-          "y": 304
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -9874,13 +9275,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 304,
-          "y": 304
+          "y": 224
         }
       },
       "escalateTicket": {
         "position": {
           "x": 464,
-          "y": 272
+          "y": 176
         },
         "size": {
           "width": 96,
@@ -9889,58 +9290,13 @@
         "collapsed": false,
         "placeholder": {
           "x": 464,
-          "y": 272
-        }
-      },
-      "emailNoc": {
-        "position": {
-          "x": 624,
-          "y": 272
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 624,
-          "y": 272
-        }
-      },
-      "sendNocEmail": {
-        "position": {
-          "x": 784,
-          "y": 224
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 784,
-          "y": 224
-        }
-      },
-      "nocEmailFailed": {
-        "position": {
-          "x": 944,
-          "y": 192
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 944,
-          "y": 192
+          "y": 176
         }
       },
       "agentContext": {
         "position": {
-          "x": 1120,
-          "y": 304
+          "x": 624,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -9948,14 +9304,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1120,
-          "y": 304
+          "x": 624,
+          "y": 224
         }
       },
       "recommend": {
         "position": {
-          "x": 1280,
-          "y": 304
+          "x": 784,
+          "y": 224
         },
         "size": {
           "width": 288,
@@ -9963,14 +9319,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1280,
-          "y": 304
+          "x": 784,
+          "y": 224
         }
       },
       "aiFailedCase": {
         "position": {
-          "x": 1632,
-          "y": 240
+          "x": 1136,
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -9978,14 +9334,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1632,
-          "y": 240
+          "x": 1136,
+          "y": 160
         }
       },
       "policyCheck": {
         "position": {
-          "x": 1632,
-          "y": 368
+          "x": 1136,
+          "y": 288
         },
         "size": {
           "width": 96,
@@ -9993,14 +9349,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1632,
-          "y": 368
+          "x": 1136,
+          "y": 288
         }
       },
       "markPending": {
         "position": {
-          "x": 1792,
-          "y": 368
+          "x": 1296,
+          "y": 288
         },
         "size": {
           "width": 96,
@@ -10008,14 +9364,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1792,
-          "y": 368
+          "x": 1296,
+          "y": 288
         }
       },
       "retentionReview": {
         "position": {
-          "x": 1952,
-          "y": 368
+          "x": 1456,
+          "y": 288
         },
         "size": {
           "width": 96,
@@ -10023,14 +9379,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 1952,
-          "y": 368
+          "x": 1456,
+          "y": 288
         }
       },
       "recheckPolicy": {
         "position": {
-          "x": 2112,
-          "y": 304
+          "x": 1616,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10038,14 +9394,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2112,
-          "y": 304
+          "x": 1616,
+          "y": 224
         }
       },
       "offerWithinPolicy": {
         "position": {
-          "x": 2272,
-          "y": 304
+          "x": 1776,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10053,58 +9409,13 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2272,
-          "y": 304
+          "x": 1776,
+          "y": 224
         }
       },
       "approveCase": {
         "position": {
-          "x": 2432,
-          "y": 160
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 2432,
-          "y": 160
-        }
-      },
-      "emailCustomer": {
-        "position": {
-          "x": 2592,
-          "y": 160
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 2592,
-          "y": 160
-        }
-      },
-      "sendFollowUp": {
-        "position": {
-          "x": 2752,
-          "y": 160
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 2752,
-          "y": 160
-        }
-      },
-      "followUpFailed": {
-        "position": {
-          "x": 2912,
+          "x": 1936,
           "y": 96
         },
         "size": {
@@ -10113,14 +9424,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2912,
+          "x": 1936,
           "y": 96
         }
       },
-      "markSent": {
+      "shouldSendFollowUp": {
         "position": {
-          "x": 2912,
-          "y": 224
+          "x": 2096,
+          "y": 96
         },
         "size": {
           "width": 96,
@@ -10128,14 +9439,44 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2912,
-          "y": 224
+          "x": 2096,
+          "y": 96
+        }
+      },
+      "sendFollowUpEmail": {
+        "position": {
+          "x": 2256,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 2256,
+          "y": 96
+        }
+      },
+      "markFollowUpSent": {
+        "position": {
+          "x": 2416,
+          "y": 96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 2416,
+          "y": 96
         }
       },
       "supervisorReview": {
         "position": {
-          "x": 2432,
-          "y": 416
+          "x": 1936,
+          "y": 288
         },
         "size": {
           "width": 96,
@@ -10143,14 +9484,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2432,
-          "y": 416
+          "x": 1936,
+          "y": 288
         }
       },
       "approveException": {
         "position": {
-          "x": 2592,
-          "y": 352
+          "x": 2096,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10158,14 +9499,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2592,
-          "y": 352
+          "x": 2096,
+          "y": 224
         }
       },
-      "emailCustomerEx": {
+      "shouldSendExceptionEmail": {
         "position": {
-          "x": 2752,
-          "y": 352
+          "x": 2256,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10173,14 +9514,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2752,
-          "y": 352
+          "x": 2256,
+          "y": 224
         }
       },
-      "sendFollowUpEx": {
+      "sendExceptionEmail": {
         "position": {
-          "x": 2912,
-          "y": 352
+          "x": 2416,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10188,14 +9529,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2912,
-          "y": 352
+          "x": 2416,
+          "y": 224
         }
       },
-      "followUpFailedEx": {
+      "markExceptionSent": {
         "position": {
-          "x": 3072,
-          "y": 288
+          "x": 2576,
+          "y": 224
         },
         "size": {
           "width": 96,
@@ -10203,29 +9544,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 3072,
-          "y": 288
-        }
-      },
-      "markSentEx": {
-        "position": {
-          "x": 3072,
-          "y": 416
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 3072,
-          "y": 416
+          "x": 2576,
+          "y": 224
         }
       },
       "rejectOffer": {
         "position": {
-          "x": 2592,
-          "y": 480
+          "x": 2096,
+          "y": 352
         },
         "size": {
           "width": 96,
@@ -10233,14 +9559,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2592,
-          "y": 480
+          "x": 2096,
+          "y": 352
         }
       },
       "closeCase": {
         "position": {
-          "x": 2112,
-          "y": 432
+          "x": 1616,
+          "y": 352
         },
         "size": {
           "width": 96,
@@ -10248,14 +9574,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 2112,
-          "y": 432
+          "x": 1616,
+          "y": 352
         }
       },
       "readRunCases": {
         "position": {
-          "x": 6816,
-          "y": -208
+          "x": 6320,
+          "y": -192
         },
         "size": {
           "width": 96,
@@ -10263,13 +9589,28 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 6816,
-          "y": -208
+          "x": 6320,
+          "y": -192
         }
       },
       "buildReport": {
         "position": {
-          "x": 7008,
+          "x": 6512,
+          "y": -192
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false,
+        "placeholder": {
+          "x": 6512,
+          "y": -192
+        }
+      },
+      "shouldSendReport": {
+        "position": {
+          "x": 6704,
           "y": -208
         },
         "size": {
@@ -10278,14 +9619,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 7008,
+          "x": 6704,
           "y": -208
         }
       },
-      "emailManager": {
+      "sendRunReportEmail": {
         "position": {
-          "x": 7200,
-          "y": -224
+          "x": 6896,
+          "y": -336
         },
         "size": {
           "width": 96,
@@ -10293,14 +9634,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 7200,
-          "y": -224
+          "x": 6896,
+          "y": -336
         }
       },
-      "sendReportEmail": {
+      "finalReturn": {
         "position": {
-          "x": 7392,
-          "y": -368
+          "x": 7088,
+          "y": -320
         },
         "size": {
           "width": 96,
@@ -10308,44 +9649,14 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 7392,
-          "y": -368
-        }
-      },
-      "reportEmailFailed": {
-        "position": {
-          "x": 7584,
-          "y": -352
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 7584,
-          "y": -352
-        }
-      },
-      "finish": {
-        "position": {
-          "x": 7776,
-          "y": -368
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false,
-        "placeholder": {
-          "x": 7776,
-          "y": -368
+          "x": 7088,
+          "y": -320
         }
       },
       "end": {
         "position": {
-          "x": 7968,
-          "y": -384
+          "x": 7280,
+          "y": -336
         },
         "size": {
           "width": 96,
@@ -10353,8 +9664,8 @@
         },
         "collapsed": false,
         "placeholder": {
-          "x": 7968,
-          "y": -384
+          "x": 7280,
+          "y": -336
         }
       },
       "dailyRun": {

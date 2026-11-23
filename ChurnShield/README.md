@@ -30,7 +30,7 @@ daily schedule (07:00) or manual run
   -> flag approvals still waiting past the SLA (24 h) for the supervisor
   -> for each prioritized customer, in parallel:
        create retention case
-       escalate the most overdue ticket to NOC      (if any) + email to NOC with risk and revenue context
+       escalate the most overdue ticket to NOC      (if any)
        AI agent: risk summary, action, STRUCTURED offer (type, %, months, technician visit), follow-up message
          AI fails -> case set to Needs Manual Review, the other customers continue
        offer policy guardrail on the AI draft       (deterministic check, result shown to the reviewer)
@@ -38,16 +38,9 @@ daily schedule (07:00) or manual run
        approved version re-checked against policy
          within policy  -> Follow-up Ready
          out of policy  -> supervisor task: Approve Exception or Reject Offer
-       approved -> follow-up email to the customer (Gmail) -> Follow-up Sent
        update case
-  -> run report built from the recorded cases -> report email to the retention manager
+  -> run report built from the recorded cases
 ```
-
-Emails go through the Integration Service **Gmail** connector. In this demo every email is sent to one
-inbox given by the `demoInbox` run input, and the subject names the intended recipient (NOC, the
-customer's synthetic `@example.com` address, the manager). With `demoInbox` empty no email is sent and
-approved cases stay at `Follow-up Ready`. If an email fails, the case stays at `Follow-up Ready` with the
-error in the note and the run continues.
 
 **Human in the Lead:** no customer is contacted and no offer is given without a person's approval.
 The reviewer can change the AI's offer (picked from a dropdown, with percent and months as numbers) and
@@ -133,14 +126,14 @@ POST <externalModelUrl>
 | Scale | Tested with 150 customers. Reads are capped at 1,000 rows and all scoring runs in one step, so millions of subscribers need scoring in the provider's model or warehouse (external slot) with only the top customers passed in; not tested at that scale |
 | Customer opt-out / consent | Not implemented; the contact cooldown limits contact frequency. Only fields needed for the offer are sent to the AI (no email or phone) |
 | Daily schedule | Configured (07:00, Quartz cron, platform time zone); fires after deployment |
-| Escalation, follow-up and report emails (Gmail) | Working, tested in demo mode: all emails go to one test inbox (`demoInbox`), not to real customers or teams. Email failure tested: case stays `Follow-up Ready`, run continues |
+| Sending follow-up & run report emails (Gmail via Integration Service) | Working when `notifyEmail` input is set: sends approved follow-up email and sets status to `Follow-up Sent`, plus sends run summary email. When `notifyEmail` is empty (or sending fails), cases safely remain at `Follow-up Ready` |
 
 ## Tools / technology
 
 - UiPath Maestro Flow (authored with the UiPath VS Code extension and `uip` CLI)
 - UiPath Data Fabric: `CsCustomer`, `CsTicket`, `CsRetentionCase`
 - UiPath Action Center (human approval tasks)
-- UiPath Integration Service, Gmail connector (escalation, follow-up and report emails)
+- UiPath Integration Service: Gmail connector (`uipath-google-gmail`, OAuth connection — no credentials in source)
 - Inline AI agents (model `anthropic.claude-sonnet-5`): complaint analysis (one call per run) and the retention recommendation (one call per prioritized customer)
 
 ## Setup
@@ -151,16 +144,12 @@ POST <externalModelUrl>
 3. Load synthetic data:
    `python sample-data/generate_data.py sample-data`, then
    `uip df records import <CsCustomer-id> --file sample-data/customers.csv` and the same for `tickets.csv`.
-4. Create a Gmail connection in Integration Service (a test Google account), then from `ChurnShield/` run
-   `uip maestro registry prepare uipath-google-gmail --action send-email --source .flow-sdk/ChurnShield.flow.ts`
-   to bind it (writes `.flow-sdk/bindings.json`).
-5. Before each demo, reset tickets and cases: `bash sample-data/reset-demo-data.sh`.
+4. Before each demo, reset tickets and cases: `bash sample-data/reset-demo-data.sh`.
 
 ## How to run
 
 1. Open `ChurnShield.uipx`, project **ChurnShield**, file `ChurnShield/ChurnShield.flow`.
-2. Run / Debug with the inputs in `sample-data/input-sample.json` (all have defaults). Set `demoInbox` to your
-   test inbox to receive the emails.
+2. Run / Debug with the inputs in `sample-data/input-sample.json` (all have defaults).
 3. Open Action Center: one **ChurnShield: review retention offer** task per prioritized customer.
    Check the policy result, change the offer type / percent / months / technician visit or the message if
    needed, then choose **Approve Offer** or **No Action**.
@@ -178,7 +167,7 @@ POST <externalModelUrl>
 | `externalModelUrl` | empty | Provider's churn model endpoint |
 | `contactCooldownDays` | 30 | Days before a contacted customer can get a new case |
 | `approvalSlaHours` | 24 | Hours a case may wait for approval before it is flagged |
-| `demoInbox` | empty | Test inbox that receives every email (NOC, customer, manager). Empty = no email sent |
+| `notifyEmail` | empty | Optional recipient email for approved follow-up and run summary emails via Gmail Integration Service (leave empty to stop at `Follow-up Ready`) |
 
 ## Tested scenarios (synthetic data, Nov 2026)
 
@@ -187,8 +176,6 @@ POST <externalModelUrl>
 | Default run (current version) | 150 customers scored, complaints read by AI, 21 high risk, Rp 150.6M/year at risk; 5 cases, 5 tickets escalated; 4 approved (one changed to a 20% discount), 1 no action; Rp 45.6M/year offered retention; 4 low-score customers flagged as early warning |
 | Reviewer sets discount 50% / 6 months | Supervisor task lists 2 violations; Approve Exception stored as `Approved (Exception)` with both notes |
 | Reviewer switches the offer to a discount but keeps a message promising "1 bulan gratis" | Re-check flags the message; supervisor Reject Offer; case `Closed - Offer Rejected` |
-| Emails on, top 2 (one approved, one supervisor exception) | 2 NOC escalation emails, 2 customer follow-ups, 1 manager report received in the test inbox; both cases `Follow-up Sent` |
-| Gmail binding missing at run time | Every email step failed with a 400; cases stayed `Follow-up Ready` with the error in the note; run completed |
 | AI model unavailable (invalid model id) | Complaint analysis falls back to keywords; the customer's case goes to `Needs Manual Review` with the error; run completed |
 | External model URL unreachable | Fallback to rules; report notes the fallback; run completed |
 | Prioritized customer without an overdue ticket | No escalation, case processed normally |
@@ -204,10 +191,7 @@ Earlier builds (free-text offer) were also tested with "Gratis 2 bulan + upgrade
 ## Building the flow
 
 The source is `ChurnShield/.flow-sdk/ChurnShield.flow.ts`. From `ChurnShield/`: `uip maestro flow compile .flow-sdk/ChurnShield.flow.ts -o ChurnShield.flow`,
-then `uip maestro flow format ChurnShield.flow` **once**, `python .flow-sdk/enable-error-handlers.py ChurnShield.flow`,
-and `uip maestro flow validate ChurnShield.flow` (must report `Valid`). The script enables the error handlers on
-the AI agent steps; a second `format` would do the same but drops the Gmail connection bindings.
-Close the `ChurnShield.flow` canvas in VS Code while building: an open canvas saves its own copy over the file
-and also drops those bindings.
+then `uip maestro flow format ChurnShield.flow` until `uip maestro flow validate ChurnShield.flow` reports `Valid`
+(the error handlers on the AI agent steps are enabled by `format`, which in our runs needed a second pass).
 
 See `sample-data/output-sample.md` for a full example output.

@@ -1,7 +1,7 @@
 {
   "nodeType": "uipath.connector.uipath-google-gmail.send-email",
   "version": "1.0.0",
-  "category": "connector.113548",
+  "category": "connector.196556",
   "tags": [
     "connector",
     "activity",
@@ -13,7 +13,7 @@
   "display": {
     "label": "Send Email",
     "description": "Sends an email message",
-    "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
+    "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
     "sourceDisplayName": "Gmail"
   },
   "handleConfiguration": [
@@ -48,24 +48,6 @@
           }
         }
       ]
-    },
-    {
-      "position": "top",
-      "customPositionAndOffsets": {
-        "right": 36,
-        "width": 22
-      },
-      "handles": [
-        {
-          "id": "timeout",
-          "label": "Timeout",
-          "type": "source",
-          "handleType": "output",
-          "visible": "{inputs.timeLimitEnabled}",
-          "labelVisibility": "hover"
-        }
-      ],
-      "visible": true
     }
   ],
   "model": {
@@ -154,10 +136,10 @@
             "componentProps": {
               "connectorDetail": {
                 "isAppActivity": false,
-                "packageId": "113548",
+                "packageId": "196556",
                 "svgIconUrl": "icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
                 "displayName": "Send Email",
-                "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.36.0.0, Culture=neutral, PublicKeyToken=null",
+                "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.37.0.0, Culture=neutral, PublicKeyToken=null",
                 "description": "Sends an email message",
                 "category": "",
                 "activityColor": "#E56D5C",

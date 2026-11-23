@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "nodeType": "uipath.connector.uipath-google-gmail.send-email",
   "version": "1.0.0",
-  "category": "connector.113548",
+  "category": "connector.196556",
   "tags": [
     "connector",
     "activity",
@@ -52,7 +52,7 @@
   "display": {
     "label": "Send Email",
     "description": "Sends an email message",
-    "icon": "https://cloud.uipath.com/6227ce4b-b49d-4504-8fcf-5ddc489fde9b/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
+    "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
     "iconBackground": "",
     "iconBackgroundDark": "",
     "operationLabel": "Send Email"

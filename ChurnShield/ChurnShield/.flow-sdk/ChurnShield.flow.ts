@@ -27,38 +27,6 @@ import { SendEmail } from "./connectors-local/uipath-google-gmail.ts";
 const MODEL = "anthropic.claude-sonnet-5";
 const item = (field: string) => v(`eachCustomer.currentItem.${field}`);
 
-// FR-09 email delivery through the Integration Service Gmail connector.
-// Demo mode: every email goes to the `demoInbox` run input, and the subject names the intended
-// recipient (NOC, the customer's synthetic address, the manager). Empty `demoInbox` = no email is sent.
-const GMAIL = { connection: "gmail", folder: "workspace" };
-const sendMail = (subject: ReturnType<typeof js>, body: ReturnType<typeof js>) =>
-  connector(SendEmail, { To: v("cfgDemoInbox"), Subject: subject, Body: body, SaveAsDraft: false }, GMAIL);
-const emailOn = js`$vars.cfgDemoInbox !== ""`;
-
-// customer follow-up after an approval (normal or supervisor exception); `sfx` keeps step names unique
-const followUpEmail = (b: any, sfx: string) =>
-  b.branch(`emailCustomer${sfx}`, emailOn, (e: any) =>
-    e
-      .step(`sendFollowUp${sfx}`, sendMail(
-        js`"[Demo ChurnShield | untuk pelanggan " + $vars.eachCustomer.currentItem.contactEmail + "] Tindak lanjut layanan internet Anda"`,
-        js`"<p>" + String($vars.retentionReview.output.followUpMessage).split("\\n").join("<br>") + "</p>" +
-          "<p><b>Penawaran:</b> " + $vars.recheckPolicy.output.offer + "</p>" +
-          "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). Penawaran disetujui oleh tim retensi.</p>"`,
-      ))
-      .onError((h: any) =>
-        h.step(`followUpFailed${sfx}`, dataFabricUpdate({
-          entity: "CsRetentionCase",
-          record: { byId: out("openCase", "Id") },
-          set: { ReviewerNote: js`"Email follow-up gagal terkirim: " + (${err(`sendFollowUp${sfx}`, "message")} || "-") + ". Status tetap Follow-up Ready."` },
-        })).continue(),
-      )
-      .step(`markSent${sfx}`, dataFabricUpdate({
-        entity: "CsRetentionCase",
-        record: { byId: out("openCase", "Id") },
-        set: { CaseStatus: "Follow-up Sent" },
-      })),
-  );
-
 const OFFER_OPTIONS = [
   { id: "offer-discount", value: "Diskon", label: "Diskon" },
   { id: "offer-upgrade", value: "Upgrade Kecepatan", label: "Upgrade Kecepatan" },
@@ -118,6 +86,30 @@ const POLICY_FN = `
     return { status: issues.length ? "Violation" : "Compliant", issues: issues.length ? issues.join("; ") : "sesuai kebijakan",
       offer: offerText(type, p, n, visit) };
   }
+  function escHtml(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function buildCustomerEmailHtml(name, code, plan, city, offer, message, ticketCode, isException) {
+    const safeMsg = escHtml(message).split(String.fromCharCode(10)).join("<br/>");
+    const ticketRow = ticketCode
+      ? "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Tiket gangguan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>" + escHtml(ticketCode) + " &mdash; diprioritaskan ke tim teknis</td></tr>"
+      : "";
+    return "<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>"
+      + "<div style='max-width:560px;margin:0 auto;'>"
+      + "<div style='border-bottom:2px solid #0062cc;padding-bottom:10px;margin-bottom:20px;'>"
+      + "<span style='font-size:14px;font-weight:700;color:#0e1721;letter-spacing:0.3px;'>Tim Layanan Pelanggan</span>"
+      + "</div>"
+      + "<p style='margin:0 0 16px 0;font-size:14.5px;line-height:1.65;color:#1f2937;'>" + safeMsg + "</p>"
+      + "<table cellspacing='0' cellpadding='0' style='width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:18px 0;padding:8px 0;'>"
+      + "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Penawaran</td><td style='padding:5px 0;color:#111827;font-size:13px;font-weight:600;'>" + escHtml(offer) + "</td></tr>"
+      + "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Pelanggan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>" + escHtml(name) + " (" + escHtml(code) + ") &middot; " + escHtml(plan) + "</td></tr>"
+      + ticketRow
+      + "</table>"
+      + "<p style='margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#374151;'>Apabila Bapak/Ibu ingin mengatur jadwal kunjungan teknisi atau membutuhkan bantuan lebih lanjut, silakan balas langsung email ini agar tim kami segera membantu.</p>"
+      + "<p style='margin:0;font-size:14px;line-height:1.6;color:#111827;'>Salam hangat,<br/><strong>Tim Retensi &amp; Layanan Pelanggan</strong></p>"
+      + "<div style='margin-top:24px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;'>Ref: " + escHtml(code) + " &middot; " + escHtml(city) + "</div>"
+      + "</div></div>";
+  }
 `;
 
 export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
@@ -130,7 +122,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .var("cfgModelUrl", types.string, "")
   .var("cfgCooldownDays", types.number, 30)
   .var("cfgSlaHours", types.number, 24)
-  .var("cfgDemoInbox", types.string, "")
+  .var("cfgNotifyEmail", types.string, "")
   .input({
     riskThreshold: { type: types.number, default: 0.6, shared: "cfgThreshold" },
     topN: { type: types.number, default: 5, shared: "cfgTopN" },
@@ -138,7 +130,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     externalModelUrl: { type: types.string, default: "", shared: "cfgModelUrl" },
     contactCooldownDays: { type: types.number, default: 30, shared: "cfgCooldownDays" },
     approvalSlaHours: { type: types.number, default: 24, shared: "cfgSlaHours" },
-    demoInbox: { type: types.string, default: "", shared: "cfgDemoInbox" }, // empty = no email sent
+    notifyEmail: { type: types.string, default: "", shared: "cfgNotifyEmail" },
   })
   .entryPoint("dailyRun", scheduled({ every: "0 0 7 * * ?" }))
   .output({
@@ -429,34 +421,12 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
             set: {
               TicketStatus: "Escalated",
               Escalated: true,
-              EscalationNote: js`"ChurnShield " + $vars.newRun.output + ": pelanggan " + $vars.eachCustomer.currentItem.customerCode +
+              EscalationNote: js`"RADAR " + $vars.newRun.output + ": pelanggan " + $vars.eachCustomer.currentItem.customerCode +
                 " risiko churn " + $vars.eachCustomer.currentItem.churnScore + " (" + $vars.eachCustomer.currentItem.riskLevel +
                 "), revenue at risk Rp " + $vars.eachCustomer.currentItem.revenueAtRisk + "/tahun, lewat SLA " +
                 $vars.eachCustomer.currentItem.hoursOverdue + " jam. Prioritaskan penanganan."`,
             },
-          }))
-          // NOC is told why this ticket jumps the queue
-          .branch("emailNoc", emailOn, (e) =>
-            e
-              .step("sendNocEmail", sendMail(
-                js`"[Demo ChurnShield | untuk NOC] Eskalasi " + $vars.eachCustomer.currentItem.overdueTicketCode + " - pelanggan risiko churn " + $vars.eachCustomer.currentItem.riskLevel`,
-                js`"<p>Tiket <b>" + $vars.eachCustomer.currentItem.overdueTicketCode + "</b> (" + $vars.eachCustomer.currentItem.overdueTicketCategory +
-                  ") sudah lewat SLA <b>" + $vars.eachCustomer.currentItem.hoursOverdue + " jam</b> dan dieskalasi otomatis.</p>" +
-                  "<p>Pelanggan: " + $vars.eachCustomer.currentItem.customerCode + " " + $vars.eachCustomer.currentItem.customerName +
-                  " (" + $vars.eachCustomer.currentItem.servicePlan + ", " + $vars.eachCustomer.currentItem.city + ")<br>" +
-                  "Skor risiko churn: <b>" + $vars.eachCustomer.currentItem.churnScore + "</b> (" + $vars.eachCustomer.currentItem.riskLevel + ")<br>" +
-                  "Revenue at risk: <b>Rp " + String($vars.eachCustomer.currentItem.revenueAtRisk).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".") + "/tahun</b></p>" +
-                  "<p>Alasan: " + $vars.eachCustomer.currentItem.reasons + "</p>" +
-                  "<p>Mohon prioritaskan penanganan. Tim retensi sedang menyiapkan tindak lanjut ke pelanggan.</p>" +
-                  "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis), run " + $vars.newRun.output + ".</p>"`,
-              ))
-              .onError((h) =>
-                h.step("nocEmailFailed", script({
-                  code: `return "NOC email failed";`,
-                  returns: "string",
-                })).stepToRef("agentContext"),
-              ),
-          ),
+          })),
       )
 
       // FR-06 AI retention recommendation (inputs prepared as plain references for the agent)
@@ -561,7 +531,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
 
       // FR-07 human approval: the officer edits the structured offer and the message before approving
       .stepSwitch("retentionReview", hitl({
-        title: "ChurnShield: review retention offer",
+        title: "RADAR: review retention offer",
         priority: "High",
         fields: [
           { id: "customer", label: "Pelanggan", type: "string", direction: "input",
@@ -594,36 +564,58 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
               .step("recheckPolicy", script({
                 code: POLICY_FN + `
                   const r = $vars.retentionReview.output;
-                  return checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage,
-                    $vars.eachCustomer.currentItem.contractMonthsLeft);
+                  const c = $vars.eachCustomer.currentItem;
+                  const res = checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage, c.contractMonthsLeft);
+                  const emailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, false);
+                  const exceptionEmailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, true);
+                  return { status: res.status, issues: res.issues, offer: res.offer, emailHtml: emailHtml, exceptionEmailHtml: exceptionEmailHtml };
                 `,
-                returns: { status: "string", issues: "string", offer: "string" },
+                returns: { status: "string", issues: "string", offer: "string", emailHtml: "string", exceptionEmailHtml: "string" },
               }))
               .branch(
                 "offerWithinPolicy",
                 js`$vars.recheckPolicy.output.status === "Compliant"`,
                 (ok) =>
-                  followUpEmail(ok.step("approveCase", dataFabricUpdate({
-                    entity: "CsRetentionCase",
-                    record: { byId: out("openCase", "Id") },
-                    set: {
-                      Decision: "Approved",
-                      CaseStatus: "Follow-up Ready",
-                      OfferDetail: out("recheckPolicy", "offer"),
-                      OfferType: out("retentionReview", "offerType"),
-                      DiscountPercent: out("retentionReview", "discountPercent"),
-                      OfferMonths: out("retentionReview", "offerMonths"),
-                      TechnicianVisit: out("retentionReview", "technicianVisit"),
-                      FollowUpMessage: out("retentionReview", "followUpMessage"),
-                      ReviewerNote: out("retentionReview", "reviewerNote"),
-                      PolicyStatus: "Compliant",
-                      PolicyIssues: "sesuai kebijakan",
-                    },
-                  })), ""),
+                  ok
+                    .step("approveCase", dataFabricUpdate({
+                      entity: "CsRetentionCase",
+                      record: { byId: out("openCase", "Id") },
+                      set: {
+                        Decision: "Approved",
+                        CaseStatus: "Follow-up Ready",
+                        OfferDetail: out("recheckPolicy", "offer"),
+                        OfferType: out("retentionReview", "offerType"),
+                        DiscountPercent: out("retentionReview", "discountPercent"),
+                        OfferMonths: out("retentionReview", "offerMonths"),
+                        TechnicianVisit: out("retentionReview", "technicianVisit"),
+                        FollowUpMessage: out("retentionReview", "followUpMessage"),
+                        ReviewerNote: out("retentionReview", "reviewerNote"),
+                        PolicyStatus: "Compliant",
+                        PolicyIssues: "sesuai kebijakan",
+                      },
+                    }))
+                    .branch(
+                      "shouldSendFollowUp",
+                      js`$vars.cfgNotifyEmail !== ""`,
+                      (mail) =>
+                        mail
+                          .step("sendFollowUpEmail", connector(SendEmail, {
+                            To: v("cfgNotifyEmail"),
+                            Subject: js`"Penawaran Khusus & Tindak Lanjut Layanan - " + $vars.eachCustomer.currentItem.customerName + " (" + $vars.eachCustomer.currentItem.customerCode + ")"`,
+                            Body: out("recheckPolicy", "emailHtml"),
+                            SaveAsDraft: false,
+                          }, { connection: "gmail", folder: "shared" }))
+                          .onError((h) => h.continue())
+                          .step("markFollowUpSent", dataFabricUpdate({
+                            entity: "CsRetentionCase",
+                            record: { byId: out("openCase", "Id") },
+                            set: { CaseStatus: "Follow-up Sent" },
+                          })),
+                    ),
                 // out of policy: a supervisor must explicitly grant an exception
                 (exc) =>
                   exc.stepSwitch("supervisorReview", hitl({
-                    title: "ChurnShield: penawaran di luar kebijakan",
+                    title: "RADAR: penawaran di luar kebijakan",
                     priority: "High",
                     fields: [
                       { id: "svCustomer", label: "Pelanggan", type: "string", direction: "input",
@@ -640,23 +632,42 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                     {
                       value: "Approve Exception",
                       body: (s) =>
-                        followUpEmail(s.step("approveException", dataFabricUpdate({
-                          entity: "CsRetentionCase",
-                          record: { byId: out("openCase", "Id") },
-                          set: {
-                            Decision: "Approved (Exception)",
-                            CaseStatus: "Follow-up Ready",
-                            OfferDetail: out("recheckPolicy", "offer"),
-                            OfferType: out("retentionReview", "offerType"),
-                            DiscountPercent: out("retentionReview", "discountPercent"),
-                            OfferMonths: out("retentionReview", "offerMonths"),
-                            TechnicianVisit: out("retentionReview", "technicianVisit"),
-                            FollowUpMessage: out("retentionReview", "followUpMessage"),
-                            ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
-                            PolicyStatus: "Exception Approved",
-                            PolicyIssues: out("recheckPolicy", "issues"),
-                          },
-                        })), "Ex"),
+                        s
+                          .step("approveException", dataFabricUpdate({
+                            entity: "CsRetentionCase",
+                            record: { byId: out("openCase", "Id") },
+                            set: {
+                              Decision: "Approved (Exception)",
+                              CaseStatus: "Follow-up Ready",
+                              OfferDetail: out("recheckPolicy", "offer"),
+                              OfferType: out("retentionReview", "offerType"),
+                              DiscountPercent: out("retentionReview", "discountPercent"),
+                              OfferMonths: out("retentionReview", "offerMonths"),
+                              TechnicianVisit: out("retentionReview", "technicianVisit"),
+                              FollowUpMessage: out("retentionReview", "followUpMessage"),
+                              ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
+                              PolicyStatus: "Exception Approved",
+                              PolicyIssues: out("recheckPolicy", "issues"),
+                            },
+                          }))
+                          .branch(
+                            "shouldSendExceptionEmail",
+                            js`$vars.cfgNotifyEmail !== ""`,
+                            (mail) =>
+                              mail
+                                .step("sendExceptionEmail", connector(SendEmail, {
+                                  To: v("cfgNotifyEmail"),
+                                  Subject: js`"Penawaran Khusus Prioritas - " + $vars.eachCustomer.currentItem.customerName + " (" + $vars.eachCustomer.currentItem.customerCode + ")"`,
+                                  Body: out("recheckPolicy", "exceptionEmailHtml"),
+                                  SaveAsDraft: false,
+                                }, { connection: "gmail", folder: "shared" }))
+                                .onError((h) => h.continue())
+                                .step("markExceptionSent", dataFabricUpdate({
+                                  entity: "CsRetentionCase",
+                                  record: { byId: out("openCase", "Id") },
+                                  set: { CaseStatus: "Follow-up Sent" },
+                                })),
+                          ),
                     },
                     {
                       value: "Reject Offer",
@@ -709,51 +720,65 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const cases = $vars.readRunCases.output.results || [];
       const p = $vars.prioritize.output;
       const approved = cases.filter((c) => c.Decision === "Approved" || c.Decision === "Approved (Exception)");
+      const sent = cases.filter((c) => c.CaseStatus === "Follow-up Sent");
       const exceptions = cases.filter((c) => c.Decision === "Approved (Exception)");
       const rejected = cases.filter((c) => c.Decision === "Rejected by Supervisor");
       const noAction = cases.filter((c) => c.Decision === "No Action");
       const aiFailed = cases.filter((c) => c.Decision === "AI Failed");
-      const sent = cases.filter((c) => c.CaseStatus === "Follow-up Sent");
       const escalated = cases.filter((c) => c.TicketEscalated === true);
       const aiFlagged = cases.filter((c) => c.PolicyStatus !== "Compliant" && c.Decision !== "No Action" && c.Decision !== "AI Failed");
       // revenue of customers who will receive an approved offer; whether they stay is not tracked yet
       const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);
       const rp = (n) => "Rp " + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
-      const summary = "ChurnShield " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
+      const summary = "RADAR " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
         $vars.scoringUsed + ", keluhan dibaca " + ($vars.complaintMode === "ai" ? "AI" : "kata kunci") + "), " +
         p.highRiskCount + " berisiko tinggi dengan revenue at risk " + rp(p.highRiskRevenue) +
         "/tahun. " + cases.length + " kasus baru diproses: " + escalated.length + " tiket dieskalasi, " + approved.length +
         " penawaran disetujui (" + rp(offeredRevenue) + "/tahun ditawari retensi" +
+        (sent.length ? ", " + sent.length + " email terkirim" : "") +
         (exceptions.length ? ", " + exceptions.length + " lewat pengecualian supervisor" : "") + "), " +
         (rejected.length ? rejected.length + " ditolak supervisor, " : "") +
         (aiFailed.length ? aiFailed.length + " perlu ditangani manual karena AI gagal, " : "") + noAction.length + " tanpa tindakan." +
-        ($vars.cfgDemoInbox !== "" ? " " + sent.length + " email follow-up terkirim (mode demo)." : " Email belum dikirim (demoInbox kosong).") +
         (p.hiddenIntent.length ? " Peringatan dini: " + p.hiddenIntent.length + " pelanggan berskor rendah menyebut niat berhenti di keluhannya." : "") +
         (p.skipped.length ? " " + p.skipped.length + " pelanggan berisiko dilewati karena sudah punya kasus atau masih masa jeda kontak." : "") +
         (p.overdue.length ? " " + p.overdue.length + " approval lewat SLA " + $vars.cfgSlaHours + " jam ditandai untuk supervisor." : "") +
         ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "") +
         ($vars.complaintMode !== "ai" && $vars.complaintNote ? " Catatan: " + $vars.complaintNote + "." : "");
-      const esc = (s) => String(s == null ? "-" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const td = "style='border:1px solid #ccc;padding:6px;vertical-align:top'";
-      const kpi = (label, value, color) => "<td style='padding:10px 16px;background:#EEF3F4;border-radius:6px'>" +
-        "<div style='font-size:22px;font-weight:bold;color:" + color + "'>" + value + "</div><div style='color:#3C5560'>" + label + "</div></td>";
-      const reportHtml =
-        "<h2 style='color:#0E2A33'>Laporan harian ChurnShield</h2><p>" + esc(summary) + "</p>" +
-        "<table cellspacing='8'><tr>" +
-          kpi("pelanggan dinilai", p.scoredCount, "#0E2A33") + kpi("berisiko tinggi", p.highRiskCount, "#D64545") +
-          kpi("revenue at risk/tahun", rp(p.highRiskRevenue), "#D64545") + kpi("tiket dieskalasi", escalated.length, "#F28C28") +
-          kpi("ditawari retensi/tahun", rp(offeredRevenue), "#3E9E6A") +
-        "</tr></table>" +
-        "<h3>Kasus run ini</h3><table style='border-collapse:collapse'><tr>" +
-          ["Pelanggan", "Skor", "Keputusan", "Status", "Penawaran", "Kebijakan"].map((h) => "<th " + td + ">" + h + "</th>").join("") + "</tr>" +
-          cases.map((c) => "<tr><td " + td + ">" + esc(c.CustomerCode + " " + c.CustomerName) + "</td><td " + td + ">" + esc(c.ChurnScore) +
-            "</td><td " + td + ">" + esc(c.Decision) + "</td><td " + td + ">" + esc(c.CaseStatus) + "</td><td " + td + ">" + esc(c.OfferDetail) +
-            "</td><td " + td + ">" + esc(c.PolicyStatus) + "</td></tr>").join("") + "</table>" +
-        (p.hiddenIntent.length ? "<h3>Peringatan dini: skor masih rendah, keluhan menyebut niat berhenti</h3><ul>" +
-          p.hiddenIntent.map((x) => "<li>" + esc(x.customer) + " (skor " + x.churnScore + "): \\"" + esc(x.complaint) + "\\"</li>").join("") + "</ul>" : "") +
-        (p.overdue.length ? "<h3>Approval lewat SLA</h3><ul>" + p.overdue.map((x) => "<li>" + esc(x.customerCode + " " + x.customerName) +
-          ", menunggu " + x.hoursWaiting + " jam</li>").join("") + "</ul>" : "") +
-        "<hr><p style='color:#777;font-size:12px'>Email demo ChurnShield (data sintetis). \\"Ditawari retensi\\" = revenue pelanggan dengan penawaran disetujui; pelanggan bertahan atau tidak belum dilacak.</p>";
+      const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const caseRows = cases.map((c) =>
+        "<tr>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#0f172a;font-weight:600;'>" + esc(c.CustomerCode + " " + c.CustomerName) + "</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>" + esc(c.ChurnScore) + " (" + esc(c.RiskLevel) + ")</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>" + esc(c.OfferDetail || "-") + "</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:700;color:#0062cc;'>" + esc(c.CaseStatus) + "</td>" +
+        "</tr>"
+      ).join("");
+      const ewHtml = p.hiddenIntent.length
+        ? "<div style='margin-top:20px;padding:12px 14px;background:#f8fafc;border-left:3px solid #0062cc;font-size:12.5px;color:#334155;'>"
+          + "<div style='font-weight:700;color:#0e1721;margin-bottom:6px;'>Peringatan Dini (" + p.hiddenIntent.length + " pelanggan skor rendah)</div>"
+          + p.hiddenIntent.map((x) => "<div style='margin-bottom:3px;'>&bull; <strong>" + esc(x.customer) + "</strong> (skor " + x.churnScore + "): &ldquo;" + esc(x.complaint) + "&rdquo;</div>").join("")
+          + "</div>"
+        : "";
+      const reportHtml = "<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>"
+        + "<div style='max-width:640px;margin:0 auto;'>"
+        + "<div style='border-bottom:2px solid #0e1721;padding-bottom:10px;margin-bottom:18px;'>"
+        + "<div style='font-size:16px;font-weight:700;color:#0e1721;'>RADAR &mdash; Laporan Run Harian</div>"
+        + "<div style='font-size:12px;color:#64748b;margin-top:2px;'>Run ID: " + esc($vars.newRun.output) + " &middot; Scoring: " + esc($vars.scoringUsed) + " &middot; Analisis Keluhan: " + ($vars.complaintMode === "ai" ? "AI" : "Kata Kunci") + "</div>"
+        + "</div>"
+        + "<table width='100%' cellspacing='0' cellpadding='0' style='margin-bottom:16px;border-collapse:collapse;'><tr>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Dinilai</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>" + p.scoredCount + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Risiko Tinggi</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>" + p.highRiskCount + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Tiket Dieskalasi</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>" + escalated.length + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Email Terkirim</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>" + sent.length + " / " + approved.length + "</div></td>"
+        + "</tr></table>"
+        + "<p style='margin:0 0 18px 0;font-size:13.5px;line-height:1.6;color:#374151;'>" + esc(summary) + "</p>"
+        + "<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;border-top:1px solid #cbd5e1;'>"
+        + "<tr><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Pelanggan</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Skor</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Penawaran</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Status</th></tr>"
+        + (caseRows || "<tr><td colspan='4' style='padding:10px;font-size:13px;color:#64748b;'>Tidak ada kasus baru pada run ini.</td></tr>")
+        + "</table>"
+        + ewHtml
+        + "<div style='margin-top:20px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:11px;color:#94a3b8;'>Angka revenue menunjukkan pelanggan yang ditawari retensi; hasil aktual dilacak terpisah setelah integrasi billing. &middot; RADAR</div>"
+        + "</div></div>";
       return {
         summary: summary,
         reportHtml: reportHtml,
@@ -763,9 +788,8 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
           customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,
           highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,
           casesProcessed: cases.length, ticketsEscalated: escalated.length,
-          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
+          offersApproved: approved.length, emailsSent: sent.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
           noAction: noAction.length, aiFailedManualReview: aiFailed.length,
-          followUpsSent: sent.length, emailMode: $vars.cfgDemoInbox !== "" ? "demo inbox" : "off",
           revenueOfferedRetention: offeredRevenue,
           revenueNote: "revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak",
           policyNotCompliantAtClose: aiFlagged.length,
@@ -780,19 +804,20 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     `,
     returns: { summary: "string", reportHtml: "string", report: "object" },
   }))
-  // daily report to the retention manager
-  .branch("emailManager", emailOn, (e) =>
-    e
-      .step("sendReportEmail", sendMail(
-        js`"[Demo ChurnShield | untuk manajer retensi] Laporan harian " + $vars.newRun.output`,
-        js`$vars.buildReport.output.reportHtml`,
-      ))
-      .onError((h) =>
-        h.step("reportEmailFailed", script({ code: `return "report email failed";`, returns: "string" }))
-          .stepToRef("finish"),
-      ),
+  .branch(
+    "shouldSendReport",
+    js`$vars.cfgNotifyEmail !== ""`,
+    (mail) =>
+      mail
+        .step("sendRunReportEmail", connector(SendEmail, {
+          To: v("cfgNotifyEmail"),
+          Subject: js`"[RADAR] Laporan Eksekutif Run " + $vars.newRun.output`,
+          Body: out("buildReport", "reportHtml"),
+          SaveAsDraft: false,
+        }, { connection: "gmail", folder: "shared" }))
+        .onError((h) => h.stepToRef("finalReturn")),
   )
-  .step("finish", script({ code: `return "done";`, returns: "string" }))
+  .step("finalReturn", script({ code: `return true;`, returns: "boolean" }))
   .return({
     runId: out("newRun"),
     scoringModeUsed: v("scoringUsed"),
