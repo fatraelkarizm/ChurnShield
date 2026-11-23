@@ -1,0 +1,157 @@
+{
+  "schemaVersion": "1",
+  "nodeType": "uipath.connector.uipath-google-gmail.send-email",
+  "version": "1.0.0",
+  "category": "connector.196556",
+  "tags": [
+    "connector",
+    "activity",
+    "API.File.Upload.Optional"
+  ],
+  "connector": {
+    "key": "uipath-google-gmail"
+  },
+  "operation": {
+    "name": "Create",
+    "objectName": "SendEmail",
+    "objectDisplayName": "Send Email",
+    "httpMethod": "POST",
+    "path": "/SendEmail",
+    "subType": "standard",
+    "supportsStreaming": false,
+    "activityType": "Curated",
+    "pathTemplate": "/SendEmail",
+    "parameters": [
+      {
+        "name": "file",
+        "type": "multipart",
+        "dataType": "file",
+        "required": false,
+        "displayName": "Attachment",
+        "description": "The attachment to be sent with the email"
+      },
+      {
+        "name": "SaveAsDraft",
+        "type": "query",
+        "dataType": "boolean",
+        "required": false,
+        "displayName": "Save as draft",
+        "description": "Send an email message. By default, the email will be saved as draft.",
+        "defaultValue": false
+      },
+      {
+        "name": "body",
+        "type": "multipart",
+        "dataType": "string",
+        "required": true,
+        "displayName": "Body",
+        "description": "The message body\n"
+      }
+    ]
+  },
+  "display": {
+    "label": "Send Email",
+    "description": "Sends an email message",
+    "icon": "https://alpha.uipath.com/311c6049-4966-4ef2-a6f3-8ceccaf38d54/studio_/typecache/icons/70091673b4573a26ec5090fa697c3bf61a0bedf4c77a302986b69d53bea30191.svg",
+    "iconBackground": "",
+    "iconBackgroundDark": "",
+    "operationLabel": "Send Email"
+  },
+  "runtime": {
+    "bpmnType": "bpmn:SendTask",
+    "serviceType": "Intsvc.ActivityExecution",
+    "activityConfigurationVersion": "v1",
+    "requiresConnection": true,
+    "requiresFolderKey": true,
+    "requiresConnectionForSchema": false
+  },
+  "inputSchema": {
+    "fields": [
+      {
+        "name": "BCC",
+        "type": "string",
+        "displayName": "BCC",
+        "description": "The hidden recipients of the email, separated by comma (,)",
+        "required": false
+      },
+      {
+        "name": "Body",
+        "type": "string",
+        "displayName": "Body",
+        "description": "The body of the email",
+        "required": false
+      },
+      {
+        "name": "CC",
+        "type": "string",
+        "displayName": "CC",
+        "description": "The secondary recipients of the email, separated by comma (,)",
+        "required": false
+      },
+      {
+        "name": "Importance",
+        "type": "string",
+        "displayName": "Importance",
+        "description": "The importance of the mail",
+        "enum": [
+          "normal",
+          "high",
+          "low"
+        ],
+        "required": false
+      },
+      {
+        "name": "ReplyTo",
+        "type": "string",
+        "displayName": "Reply to",
+        "description": "The email addresses to use when replying, separated by comma (,)",
+        "required": false
+      },
+      {
+        "name": "Subject",
+        "type": "string",
+        "displayName": "Subject",
+        "description": "The subject of the email",
+        "required": false
+      },
+      {
+        "name": "To",
+        "type": "string",
+        "displayName": "To",
+        "description": "The primary recipients of the email, separated by comma (,)",
+        "required": true
+      }
+    ]
+  },
+  "outputSchema": {
+    "fields": [
+      {
+        "name": "Importance",
+        "type": "string",
+        "displayName": "Importance",
+        "description": "The importance of the mail",
+        "enum": [
+          "normal",
+          "high",
+          "low"
+        ]
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "displayName": "Id",
+        "primaryKey": true
+      },
+      {
+        "name": "labelIds[*]",
+        "type": "string",
+        "displayName": "Label ids"
+      },
+      {
+        "name": "threadId",
+        "type": "string",
+        "displayName": "Thread id"
+      }
+    ]
+  }
+}

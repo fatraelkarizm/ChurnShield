@@ -18,10 +18,11 @@
  * Data is synthetic. No customer is contacted without approval.
  */
 import {
-  flow, scheduled, script, inlineAgent, hitl, http,
+  flow, scheduled, script, inlineAgent, hitl, http, connector,
   dataFabricRead, dataFabricCreate, dataFabricUpdate,
   out, v, lit, js, err, types,
 } from "@uipath/maestro-builder-sdk";
+import { SendEmail } from "./connectors-local/uipath-google-gmail.ts";
 
 const MODEL = "anthropic.claude-sonnet-5";
 const item = (field: string) => v(`eachCustomer.currentItem.${field}`);
@@ -85,6 +86,30 @@ const POLICY_FN = `
     return { status: issues.length ? "Violation" : "Compliant", issues: issues.length ? issues.join("; ") : "sesuai kebijakan",
       offer: offerText(type, p, n, visit) };
   }
+  function escHtml(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function buildCustomerEmailHtml(name, code, plan, city, offer, message, ticketCode, isException) {
+    const safeMsg = escHtml(message).split(String.fromCharCode(10)).join("<br/>");
+    const ticketRow = ticketCode
+      ? "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Tiket gangguan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>" + escHtml(ticketCode) + " &mdash; diprioritaskan ke tim teknis</td></tr>"
+      : "";
+    return "<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>"
+      + "<div style='max-width:560px;margin:0 auto;'>"
+      + "<div style='border-bottom:2px solid #0062cc;padding-bottom:10px;margin-bottom:20px;'>"
+      + "<span style='font-size:14px;font-weight:700;color:#0e1721;letter-spacing:0.3px;'>Tim Layanan Pelanggan</span>"
+      + "</div>"
+      + "<p style='margin:0 0 16px 0;font-size:14.5px;line-height:1.65;color:#1f2937;'>" + safeMsg + "</p>"
+      + "<table cellspacing='0' cellpadding='0' style='width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:18px 0;padding:8px 0;'>"
+      + "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Penawaran</td><td style='padding:5px 0;color:#111827;font-size:13px;font-weight:600;'>" + escHtml(offer) + "</td></tr>"
+      + "<tr><td style='padding:5px 12px 5px 0;color:#64748b;font-size:13px;white-space:nowrap;'>Pelanggan</td><td style='padding:5px 0;color:#111827;font-size:13px;'>" + escHtml(name) + " (" + escHtml(code) + ") &middot; " + escHtml(plan) + "</td></tr>"
+      + ticketRow
+      + "</table>"
+      + "<p style='margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#374151;'>Apabila Bapak/Ibu ingin mengatur jadwal kunjungan teknisi atau membutuhkan bantuan lebih lanjut, silakan balas langsung email ini agar tim kami segera membantu.</p>"
+      + "<p style='margin:0;font-size:14px;line-height:1.6;color:#111827;'>Salam hangat,<br/><strong>Tim Retensi &amp; Layanan Pelanggan</strong></p>"
+      + "<div style='margin-top:24px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;'>Ref: " + escHtml(code) + " &middot; " + escHtml(city) + "</div>"
+      + "</div></div>";
+  }
 `;
 
 export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
@@ -97,6 +122,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
   .var("cfgModelUrl", types.string, "")
   .var("cfgCooldownDays", types.number, 30)
   .var("cfgSlaHours", types.number, 24)
+  .var("cfgNotifyEmail", types.string, "")
   .input({
     riskThreshold: { type: types.number, default: 0.6, shared: "cfgThreshold" },
     topN: { type: types.number, default: 5, shared: "cfgTopN" },
@@ -104,6 +130,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
     externalModelUrl: { type: types.string, default: "", shared: "cfgModelUrl" },
     contactCooldownDays: { type: types.number, default: 30, shared: "cfgCooldownDays" },
     approvalSlaHours: { type: types.number, default: 24, shared: "cfgSlaHours" },
+    notifyEmail: { type: types.string, default: "", shared: "cfgNotifyEmail" },
   })
   .entryPoint("dailyRun", scheduled({ every: "0 0 7 * * ?" }))
   .output({
@@ -394,7 +421,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
             set: {
               TicketStatus: "Escalated",
               Escalated: true,
-              EscalationNote: js`"ChurnShield " + $vars.newRun.output + ": pelanggan " + $vars.eachCustomer.currentItem.customerCode +
+              EscalationNote: js`"RADAR " + $vars.newRun.output + ": pelanggan " + $vars.eachCustomer.currentItem.customerCode +
                 " risiko churn " + $vars.eachCustomer.currentItem.churnScore + " (" + $vars.eachCustomer.currentItem.riskLevel +
                 "), revenue at risk Rp " + $vars.eachCustomer.currentItem.revenueAtRisk + "/tahun, lewat SLA " +
                 $vars.eachCustomer.currentItem.hoursOverdue + " jam. Prioritaskan penanganan."`,
@@ -504,7 +531,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
 
       // FR-07 human approval: the officer edits the structured offer and the message before approving
       .stepSwitch("retentionReview", hitl({
-        title: "ChurnShield: review retention offer",
+        title: "RADAR: review retention offer",
         priority: "High",
         fields: [
           { id: "customer", label: "Pelanggan", type: "string", direction: "input",
@@ -537,36 +564,58 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
               .step("recheckPolicy", script({
                 code: POLICY_FN + `
                   const r = $vars.retentionReview.output;
-                  return checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage,
-                    $vars.eachCustomer.currentItem.contractMonthsLeft);
+                  const c = $vars.eachCustomer.currentItem;
+                  const res = checkPolicy(r.offerType, r.discountPercent, r.offerMonths, r.technicianVisit, r.followUpMessage, c.contractMonthsLeft);
+                  const emailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, false);
+                  const exceptionEmailHtml = buildCustomerEmailHtml(c.customerName, c.customerCode, c.servicePlan, c.city, res.offer, r.followUpMessage, c.overdueTicketCode, true);
+                  return { status: res.status, issues: res.issues, offer: res.offer, emailHtml: emailHtml, exceptionEmailHtml: exceptionEmailHtml };
                 `,
-                returns: { status: "string", issues: "string", offer: "string" },
+                returns: { status: "string", issues: "string", offer: "string", emailHtml: "string", exceptionEmailHtml: "string" },
               }))
               .branch(
                 "offerWithinPolicy",
                 js`$vars.recheckPolicy.output.status === "Compliant"`,
                 (ok) =>
-                  ok.step("approveCase", dataFabricUpdate({
-                    entity: "CsRetentionCase",
-                    record: { byId: out("openCase", "Id") },
-                    set: {
-                      Decision: "Approved",
-                      CaseStatus: "Follow-up Ready",
-                      OfferDetail: out("recheckPolicy", "offer"),
-                      OfferType: out("retentionReview", "offerType"),
-                      DiscountPercent: out("retentionReview", "discountPercent"),
-                      OfferMonths: out("retentionReview", "offerMonths"),
-                      TechnicianVisit: out("retentionReview", "technicianVisit"),
-                      FollowUpMessage: out("retentionReview", "followUpMessage"),
-                      ReviewerNote: out("retentionReview", "reviewerNote"),
-                      PolicyStatus: "Compliant",
-                      PolicyIssues: "sesuai kebijakan",
-                    },
-                  })),
+                  ok
+                    .step("approveCase", dataFabricUpdate({
+                      entity: "CsRetentionCase",
+                      record: { byId: out("openCase", "Id") },
+                      set: {
+                        Decision: "Approved",
+                        CaseStatus: "Follow-up Ready",
+                        OfferDetail: out("recheckPolicy", "offer"),
+                        OfferType: out("retentionReview", "offerType"),
+                        DiscountPercent: out("retentionReview", "discountPercent"),
+                        OfferMonths: out("retentionReview", "offerMonths"),
+                        TechnicianVisit: out("retentionReview", "technicianVisit"),
+                        FollowUpMessage: out("retentionReview", "followUpMessage"),
+                        ReviewerNote: out("retentionReview", "reviewerNote"),
+                        PolicyStatus: "Compliant",
+                        PolicyIssues: "sesuai kebijakan",
+                      },
+                    }))
+                    .branch(
+                      "shouldSendFollowUp",
+                      js`$vars.cfgNotifyEmail !== ""`,
+                      (mail) =>
+                        mail
+                          .step("sendFollowUpEmail", connector(SendEmail, {
+                            To: v("cfgNotifyEmail"),
+                            Subject: js`"Penawaran Khusus & Tindak Lanjut Layanan - " + $vars.eachCustomer.currentItem.customerName + " (" + $vars.eachCustomer.currentItem.customerCode + ")"`,
+                            Body: out("recheckPolicy", "emailHtml"),
+                            SaveAsDraft: false,
+                          }, { connection: "gmail", folder: "shared" }))
+                          .onError((h) => h.continue())
+                          .step("markFollowUpSent", dataFabricUpdate({
+                            entity: "CsRetentionCase",
+                            record: { byId: out("openCase", "Id") },
+                            set: { CaseStatus: "Follow-up Sent" },
+                          })),
+                    ),
                 // out of policy: a supervisor must explicitly grant an exception
                 (exc) =>
                   exc.stepSwitch("supervisorReview", hitl({
-                    title: "ChurnShield: penawaran di luar kebijakan",
+                    title: "RADAR: penawaran di luar kebijakan",
                     priority: "High",
                     fields: [
                       { id: "svCustomer", label: "Pelanggan", type: "string", direction: "input",
@@ -583,23 +632,42 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
                     {
                       value: "Approve Exception",
                       body: (s) =>
-                        s.step("approveException", dataFabricUpdate({
-                          entity: "CsRetentionCase",
-                          record: { byId: out("openCase", "Id") },
-                          set: {
-                            Decision: "Approved (Exception)",
-                            CaseStatus: "Follow-up Ready",
-                            OfferDetail: out("recheckPolicy", "offer"),
-                            OfferType: out("retentionReview", "offerType"),
-                            DiscountPercent: out("retentionReview", "discountPercent"),
-                            OfferMonths: out("retentionReview", "offerMonths"),
-                            TechnicianVisit: out("retentionReview", "technicianVisit"),
-                            FollowUpMessage: out("retentionReview", "followUpMessage"),
-                            ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
-                            PolicyStatus: "Exception Approved",
-                            PolicyIssues: out("recheckPolicy", "issues"),
-                          },
-                        })),
+                        s
+                          .step("approveException", dataFabricUpdate({
+                            entity: "CsRetentionCase",
+                            record: { byId: out("openCase", "Id") },
+                            set: {
+                              Decision: "Approved (Exception)",
+                              CaseStatus: "Follow-up Ready",
+                              OfferDetail: out("recheckPolicy", "offer"),
+                              OfferType: out("retentionReview", "offerType"),
+                              DiscountPercent: out("retentionReview", "discountPercent"),
+                              OfferMonths: out("retentionReview", "offerMonths"),
+                              TechnicianVisit: out("retentionReview", "technicianVisit"),
+                              FollowUpMessage: out("retentionReview", "followUpMessage"),
+                              ReviewerNote: js`"Reviewer: " + ($vars.retentionReview.output.reviewerNote || "-") + " | Supervisor: " + ($vars.supervisorReview.output.supervisorNote || "-")`,
+                              PolicyStatus: "Exception Approved",
+                              PolicyIssues: out("recheckPolicy", "issues"),
+                            },
+                          }))
+                          .branch(
+                            "shouldSendExceptionEmail",
+                            js`$vars.cfgNotifyEmail !== ""`,
+                            (mail) =>
+                              mail
+                                .step("sendExceptionEmail", connector(SendEmail, {
+                                  To: v("cfgNotifyEmail"),
+                                  Subject: js`"Penawaran Khusus Prioritas - " + $vars.eachCustomer.currentItem.customerName + " (" + $vars.eachCustomer.currentItem.customerCode + ")"`,
+                                  Body: out("recheckPolicy", "exceptionEmailHtml"),
+                                  SaveAsDraft: false,
+                                }, { connection: "gmail", folder: "shared" }))
+                                .onError((h) => h.continue())
+                                .step("markExceptionSent", dataFabricUpdate({
+                                  entity: "CsRetentionCase",
+                                  record: { byId: out("openCase", "Id") },
+                                  set: { CaseStatus: "Follow-up Sent" },
+                                })),
+                          ),
                     },
                     {
                       value: "Reject Offer",
@@ -652,6 +720,7 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       const cases = $vars.readRunCases.output.results || [];
       const p = $vars.prioritize.output;
       const approved = cases.filter((c) => c.Decision === "Approved" || c.Decision === "Approved (Exception)");
+      const sent = cases.filter((c) => c.CaseStatus === "Follow-up Sent");
       const exceptions = cases.filter((c) => c.Decision === "Approved (Exception)");
       const rejected = cases.filter((c) => c.Decision === "Rejected by Supervisor");
       const noAction = cases.filter((c) => c.Decision === "No Action");
@@ -661,11 +730,12 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
       // revenue of customers who will receive an approved offer; whether they stay is not tracked yet
       const offeredRevenue = approved.reduce((s, c) => s + Number(c.RevenueAtRisk || 0), 0);
       const rp = (n) => "Rp " + String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
-      const summary = "ChurnShield " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
+      const summary = "RADAR " + $vars.newRun.output + ": " + p.scoredCount + " pelanggan dinilai (" +
         $vars.scoringUsed + ", keluhan dibaca " + ($vars.complaintMode === "ai" ? "AI" : "kata kunci") + "), " +
         p.highRiskCount + " berisiko tinggi dengan revenue at risk " + rp(p.highRiskRevenue) +
         "/tahun. " + cases.length + " kasus baru diproses: " + escalated.length + " tiket dieskalasi, " + approved.length +
         " penawaran disetujui (" + rp(offeredRevenue) + "/tahun ditawari retensi" +
+        (sent.length ? ", " + sent.length + " email terkirim" : "") +
         (exceptions.length ? ", " + exceptions.length + " lewat pengecualian supervisor" : "") + "), " +
         (rejected.length ? rejected.length + " ditolak supervisor, " : "") +
         (aiFailed.length ? aiFailed.length + " perlu ditangani manual karena AI gagal, " : "") + noAction.length + " tanpa tindakan." +
@@ -674,15 +744,51 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         (p.overdue.length ? " " + p.overdue.length + " approval lewat SLA " + $vars.cfgSlaHours + " jam ditandai untuk supervisor." : "") +
         ($vars.scoringNote ? " Catatan: " + $vars.scoringNote + "." : "") +
         ($vars.complaintMode !== "ai" && $vars.complaintNote ? " Catatan: " + $vars.complaintNote + "." : "");
+      const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const caseRows = cases.map((c) =>
+        "<tr>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#0f172a;font-weight:600;'>" + esc(c.CustomerCode + " " + c.CustomerName) + "</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>" + esc(c.ChurnScore) + " (" + esc(c.RiskLevel) + ")</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;'>" + esc(c.OfferDetail || "-") + "</td>" +
+        "<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:700;color:#0062cc;'>" + esc(c.CaseStatus) + "</td>" +
+        "</tr>"
+      ).join("");
+      const ewHtml = p.hiddenIntent.length
+        ? "<div style='margin-top:20px;padding:12px 14px;background:#f8fafc;border-left:3px solid #0062cc;font-size:12.5px;color:#334155;'>"
+          + "<div style='font-weight:700;color:#0e1721;margin-bottom:6px;'>Peringatan Dini (" + p.hiddenIntent.length + " pelanggan skor rendah)</div>"
+          + p.hiddenIntent.map((x) => "<div style='margin-bottom:3px;'>&bull; <strong>" + esc(x.customer) + "</strong> (skor " + x.churnScore + "): &ldquo;" + esc(x.complaint) + "&rdquo;</div>").join("")
+          + "</div>"
+        : "";
+      const reportHtml = "<div style='margin:0;padding:20px 12px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#1f2937;'>"
+        + "<div style='max-width:640px;margin:0 auto;'>"
+        + "<div style='border-bottom:2px solid #0e1721;padding-bottom:10px;margin-bottom:18px;'>"
+        + "<div style='font-size:16px;font-weight:700;color:#0e1721;'>RADAR &mdash; Laporan Run Harian</div>"
+        + "<div style='font-size:12px;color:#64748b;margin-top:2px;'>Run ID: " + esc($vars.newRun.output) + " &middot; Scoring: " + esc($vars.scoringUsed) + " &middot; Analisis Keluhan: " + ($vars.complaintMode === "ai" ? "AI" : "Kata Kunci") + "</div>"
+        + "</div>"
+        + "<table width='100%' cellspacing='0' cellpadding='0' style='margin-bottom:16px;border-collapse:collapse;'><tr>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Dinilai</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>" + p.scoredCount + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Risiko Tinggi</div><div style='font-size:18px;font-weight:700;color:#0e1721;'>" + p.highRiskCount + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Tiket Dieskalasi</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>" + escalated.length + "</div></td>"
+        + "<td style='padding:10px 12px;border:1px solid #e5e7eb;'><div style='font-size:11px;color:#64748b;'>Email Terkirim</div><div style='font-size:18px;font-weight:700;color:#0062cc;'>" + sent.length + " / " + approved.length + "</div></td>"
+        + "</tr></table>"
+        + "<p style='margin:0 0 18px 0;font-size:13.5px;line-height:1.6;color:#374151;'>" + esc(summary) + "</p>"
+        + "<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;border-top:1px solid #cbd5e1;'>"
+        + "<tr><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Pelanggan</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Skor</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Penawaran</th><th align='left' style='padding:8px 10px;border-bottom:1px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;'>Status</th></tr>"
+        + (caseRows || "<tr><td colspan='4' style='padding:10px;font-size:13px;color:#64748b;'>Tidak ada kasus baru pada run ini.</td></tr>")
+        + "</table>"
+        + ewHtml
+        + "<div style='margin-top:20px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:11px;color:#94a3b8;'>Angka revenue menunjukkan pelanggan yang ditawari retensi; hasil aktual dilacak terpisah setelah integrasi billing. &middot; RADAR</div>"
+        + "</div></div>";
       return {
         summary: summary,
+        reportHtml: reportHtml,
         report: {
           runId: $vars.newRun.output, scoringMode: $vars.scoringUsed, scoringNote: $vars.scoringNote,
           complaintAnalysis: $vars.complaintMode, complaintNote: $vars.complaintNote,
           customersScored: p.scoredCount, openTickets: $vars.buildFeatures.output.openTicketCount,
           highRiskCount: p.highRiskCount, revenueAtRisk: p.highRiskRevenue,
           casesProcessed: cases.length, ticketsEscalated: escalated.length,
-          offersApproved: approved.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
+          offersApproved: approved.length, emailsSent: sent.length, policyExceptions: exceptions.length, rejectedBySupervisor: rejected.length,
           noAction: noAction.length, aiFailedManualReview: aiFailed.length,
           revenueOfferedRetention: offeredRevenue,
           revenueNote: "revenue pelanggan yang ditawari retensi; pelanggan bertahan atau tidak belum dilacak",
@@ -696,8 +802,22 @@ export default flow("f10cb1af-e962-41ad-aba8-40d250ac2453")
         }
       };
     `,
-    returns: { summary: "string", report: "object" },
+    returns: { summary: "string", reportHtml: "string", report: "object" },
   }))
+  .branch(
+    "shouldSendReport",
+    js`$vars.cfgNotifyEmail !== ""`,
+    (mail) =>
+      mail
+        .step("sendRunReportEmail", connector(SendEmail, {
+          To: v("cfgNotifyEmail"),
+          Subject: js`"[RADAR] Laporan Eksekutif Run " + $vars.newRun.output`,
+          Body: out("buildReport", "reportHtml"),
+          SaveAsDraft: false,
+        }, { connection: "gmail", folder: "shared" }))
+        .onError((h) => h.stepToRef("finalReturn")),
+  )
+  .step("finalReturn", script({ code: `return true;`, returns: "boolean" }))
   .return({
     runId: out("newRun"),
     scoringModeUsed: v("scoringUsed"),

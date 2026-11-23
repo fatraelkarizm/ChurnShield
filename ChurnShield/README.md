@@ -126,13 +126,14 @@ POST <externalModelUrl>
 | Scale | Tested with 150 customers. Reads are capped at 1,000 rows and all scoring runs in one step, so millions of subscribers need scoring in the provider's model or warehouse (external slot) with only the top customers passed in; not tested at that scale |
 | Customer opt-out / consent | Not implemented; the contact cooldown limits contact frequency. Only fields needed for the offer are sent to the AI (no email or phone) |
 | Daily schedule | Configured (07:00, Quartz cron, platform time zone); fires after deployment |
-| Sending follow-up / escalation / report emails | Not connected yet. Cases stop at `Follow-up Ready`; nothing is claimed as sent |
+| Sending follow-up & run report emails (Gmail via Integration Service) | Working when `notifyEmail` input is set: sends approved follow-up email and sets status to `Follow-up Sent`, plus sends run summary email. When `notifyEmail` is empty (or sending fails), cases safely remain at `Follow-up Ready` |
 
 ## Tools / technology
 
 - UiPath Maestro Flow (authored with the UiPath VS Code extension and `uip` CLI)
 - UiPath Data Fabric: `CsCustomer`, `CsTicket`, `CsRetentionCase`
 - UiPath Action Center (human approval tasks)
+- UiPath Integration Service: Gmail connector (`uipath-google-gmail`, OAuth connection — no credentials in source)
 - Inline AI agents (model `anthropic.claude-sonnet-5`): complaint analysis (one call per run) and the retention recommendation (one call per prioritized customer)
 
 ## Setup
@@ -166,6 +167,7 @@ POST <externalModelUrl>
 | `externalModelUrl` | empty | Provider's churn model endpoint |
 | `contactCooldownDays` | 30 | Days before a contacted customer can get a new case |
 | `approvalSlaHours` | 24 | Hours a case may wait for approval before it is flagged |
+| `notifyEmail` | empty | Optional recipient email for approved follow-up and run summary emails via Gmail Integration Service (leave empty to stop at `Follow-up Ready`) |
 
 ## Tested scenarios (synthetic data, Nov 2026)
 

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "bindings": [
+    {
+      "id": "gmail",
+      "name": "gmail",
+      "resource": "Connection",
+      "resourceKey": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "default": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "propertyAttribute": "ConnectionId"
+    },
+    {
+      "id": "shared",
+      "name": "shared",
+      "resource": "Connection",
+      "resourceKey": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
+      "default": "279e4d63-e3cb-44df-b7e5-26a13c6bc9d1",
+      "propertyAttribute": "FolderKey"
+    }
+  ]
+}

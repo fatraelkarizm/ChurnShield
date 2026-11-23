@@ -1,0 +1,38 @@
+{
+  "version": "2.0",
+  "resources": [
+    {
+      "resource": "connection",
+      "key": "4fdab537-5416-45d8-843d-47e6eecc798d",
+      "id": "connection4fdab537-5416-45d8-843d-47e6eecc798d",
+      "value": {
+        "ConnectionId": {
+          "defaultValue": "4fdab537-5416-45d8-843d-47e6eecc798d",
+          "isExpression": false,
+          "displayName": "uipath-google-gmail connection"
+        }
+      },
+      "metadata": {
+        "ActivityName": "sendFollowUpEmail",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "uipath-google-gmail connection",
+        "UseConnectionService": "true",
+        "Connector": "uipath-google-gmail"
+      }
+    },
+    {
+      "resource": "TimeTrigger",
+      "key": "dailyRun",
+      "id": "TimeTrigger_dailyRun",
+      "value": {},
+      "metadata": {
+        "TimeZone": null,
+        "CronExpression": "0 0 7 * * ?",
+        "ActivityName": "Time Trigger",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "FullName",
+        "SolutionsSupport": "true"
+      }
+    }
+  ]
+}

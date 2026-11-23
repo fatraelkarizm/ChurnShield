@@ -4,5 +4,6 @@
   "scoringMode": "rules",
   "externalModelUrl": "",
   "contactCooldownDays": 30,
-  "approvalSlaHours": 24
+  "approvalSlaHours": 24,
+  "notifyEmail": ""
 }

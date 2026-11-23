@@ -3,17 +3,17 @@
   "settings": {
     "model": "anthropic.claude-sonnet-5",
     "maxTokens": 16384,
-    "temperature": 1,
+    "temperature": 0,
     "engine": "basic-v2",
-    "maxIterations": 25,
     "mode": "standard"
   },
+  "projectId": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
+  "id": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
+  "name": "analyzeComplaints",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "buildFeatures__output__complaintLines": {
-        "type": "string"
-      }
+      "buildFeatures__output__complaintLines": {}
     }
   },
   "outputSchema": {
@@ -28,7 +28,12 @@
       "notes": {
         "type": "string"
       }
-    }
+    },
+    "required": [
+      "negativeCodes",
+      "churnIntentCodes",
+      "notes"
+    ]
   },
   "metadata": {
     "storageVersion": "50.0.0",
@@ -62,8 +67,5 @@
         }
       ]
     }
-  ],
-  "projectId": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
-  "id": "43838e2e-fb0d-4520-9d7b-7c3a060f05c8",
-  "name": "analyzeComplaints"
+  ]
 }
